@@ -25,7 +25,9 @@ class Menu extends React.Component {
         this.removeListeners();
     }
     addListeners () {
-        document.addEventListener('mouseup', this.handleClick);
+        setTimeout(() => {
+            document.addEventListener('mouseup', this.handleClick);
+        }, 0); // Delay to avoid immediate trigger from the same click that opened the menu
     }
     removeListeners () {
         document.removeEventListener('mouseup', this.handleClick);
