@@ -693,7 +693,8 @@ class MenuBar extends React.Component {
                         ) : [])}
                     </div>
                     <Divider className={classNames(styles.divider)} />
-                    <div className={styles.fileGroup}>
+                    {/* Commenting out Tutorials and Debug */}
+                    {/* <div className={styles.fileGroup}>
                         <div
                             aria-label={this.props.intl.formatMessage(ariaMessages.tutorials)}
                             className={
@@ -722,7 +723,7 @@ class MenuBar extends React.Component {
                                 <FormattedMessage {...ariaMessages.debug} />
                             </span>
                         </div>
-                    </div>
+                    </div> */}
                 </div>
 
                 {/* show the proper UI in the account menu, given whether the user is
@@ -948,7 +949,7 @@ MenuBar.propTypes = {
 };
 
 MenuBar.defaultProps = {
-    logo: scratchLogo,
+    logo: prehistoricLogo, // can change logo here!
     onShare: () => {}
 };
 

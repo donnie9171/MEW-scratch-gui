@@ -238,7 +238,7 @@ const GUIComponent = props => {
                     isTotallyNormal={isTotallyNormal}
                     logo={logo}
                     renderLogin={renderLogin}
-                    showComingSoon={showComingSoon}
+                    showComingSoon={false}
                     onClickAbout={onClickAbout}
                     onClickAccountNav={onClickAccountNav}
                     onClickLogo={onClickLogo}
@@ -310,6 +310,17 @@ const GUIComponent = props => {
                                             id="gui.gui.soundsTab"
                                         />
                                     </Tab>
+                                    <Tab className={tabClassNames.tab}>
+                                        <img
+                                            draggable={false}
+                                            src={codeIcon}
+                                        />
+                                        <FormattedMessage
+                                            defaultMessage="MEW"
+                                            description="Button to get to the MEW panel"
+                                            id="gui.gui.mewTab"
+                                        />
+                                    </Tab>
                                 </TabList>
                                 <TabPanel className={tabClassNames.tabPanel}>
                                     <Box className={styles.blocksWrapper}>
@@ -350,9 +361,10 @@ const GUIComponent = props => {
                                     {soundsTabVisible ? <SoundTab vm={vm} /> : null}
                                 </TabPanel>
                             </Tabs>
-                            {backpackVisible ? (
+                            {false ? (
                                 <Backpack host={backpackHost} />
-                            ) : null}
+                            ) : null} 
+                            {/* disable backpack */}
                         </Box>
 
                         <Box className={classNames(styles.stageAndTargetWrapper, styles[stageSize])}>
