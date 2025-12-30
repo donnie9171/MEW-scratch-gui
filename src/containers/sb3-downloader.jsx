@@ -4,6 +4,7 @@ import React from 'react';
 import {connect} from 'react-redux';
 import {projectTitleInitialState} from '../reducers/project-title';
 import downloadBlob from '../lib/download-blob';
+import JSZip from 'jszip';
 /**
  * Project saver component passes a downloadProject function to its child.
  * It expects this child to be a function with the signature
@@ -25,13 +26,25 @@ class SB3Downloader extends React.Component {
             'downloadProject'
         ]);
     }
-    downloadProject () {
-        this.props.saveProjectSb3().then(content => {
-            if (this.props.onSaveFinished) {
-                this.props.onSaveFinished();
-            }
-            downloadBlob(this.props.projectFilename, content);
-        });
+    async downloadProject () {
+        const content = await this.props.saveProjectSb3();
+
+        // Unzip the existing .sb3 blob
+        const zip = await JSZip.loadAsync(content);
+
+        // Add your extra JSON file (replace with your actual payload)
+        const mewSaveData = { foo: 'bar', timestamp: Date.now() }; // Example payload
+        zip.file('mew.json', JSON.stringify(mewSaveData, null, 2));
+
+        // Re-zip and create new blob
+        const newBlob = await zip.generateAsync({type: 'blob'});
+
+        // Download the new blob
+        downloadBlob(this.props.projectFilename, newBlob);
+
+        if (this.props.onSaveFinished) {
+            this.props.onSaveFinished();
+        }
     }
     render () {
         const {
@@ -49,7 +62,7 @@ const getProjectFilename = (curTitle, defaultTitle) => {
     if (!filenameTitle || filenameTitle.length === 0) {
         filenameTitle = defaultTitle;
     }
-    return `${filenameTitle.substring(0, 100)}.sb3`;
+    return `${filenameTitle.substring(0, 100)}.sb3`; // can consider changing to .mew for distinction from standard scratch files -> would need to change file input handling too
 };
 
 SB3Downloader.propTypes = {
