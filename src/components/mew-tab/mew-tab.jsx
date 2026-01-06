@@ -1,9 +1,10 @@
 import React from 'react';
+import styles from './mew-tab.css';
 const MewTabComponent = props => (
-    <div>
-        <button onClick={props.onTestVm}>Test VM</button>
-        <button onClick={props.onLogMyVariable}>Log "my variable"</button>
-        <button onClick={props.onTestAzureApi}>Test Azure API</button>
+    <div className={styles.wrapper}>
+        <button className={styles.button} onClick={props.onTestVm}>Test VM</button>
+        <button className={styles.button} onClick={props.onLogMyVariable}>Log "my variable"</button>
+        <button className={styles.button} onClick={props.onTestAzureApi}>Test Azure API</button>
     </div>
 );
 

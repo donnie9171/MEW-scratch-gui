@@ -129,6 +129,11 @@
     z-index: 4; /* Make sure selected is always above */
 }
 
+/* Custom highlight for the MEW tab when selected */
+.mew-tab-button.tab.is-selected {
+    background-color: $mew-background !important;
+}
+
 .tab img {
     width: 1.375rem;
     filter: grayscale(100%);

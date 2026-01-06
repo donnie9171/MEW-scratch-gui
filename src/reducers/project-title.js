@@ -1,8 +1,7 @@
 const SET_PROJECT_TITLE = 'projectTitle/SET_PROJECT_TITLE';
 
-// we are initializing to a blank string instead of an actual title,
-// because it would be hard to localize here
-const initialState = '';
+// changed default project title from 'Scratch Project' to 'MEW Project'
+const initialState = 'MEW Project';
 
 const reducer = function (state, action) {
     if (typeof state === 'undefined') state = initialState;

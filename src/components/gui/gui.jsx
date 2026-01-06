@@ -41,6 +41,7 @@ import addExtensionIcon from './icon--extensions.svg';
 import codeIcon from './icon--code.svg';
 import costumesIcon from './icon--costumes.svg';
 import soundsIcon from './icon--sounds.svg';
+import agentsIcon from './icon--agents.png';
 import DebugModal from '../debug-modal/debug-modal.jsx';
 
 const messages = defineMessages({
@@ -311,13 +312,15 @@ const GUIComponent = props => {
                                             id="gui.gui.soundsTab"
                                         />
                                     </Tab>
-                                    <Tab className={tabClassNames.tab}>
+                                    <Tab 
+                                        className={classNames(tabClassNames.tab, styles.mewTabButton)}
+                                    >
                                         <img
                                             draggable={false}
-                                            src={codeIcon}
+                                            src={agentsIcon}
                                         />
                                         <FormattedMessage
-                                            defaultMessage="MEW"
+                                            defaultMessage="Agents"
                                             description="Button to get to the MEW panel"
                                             id="gui.gui.mewTab"
                                         />
