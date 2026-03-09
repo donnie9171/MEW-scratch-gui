@@ -30,6 +30,38 @@ $border-radius: 0.25rem;
     border-bottom-left-radius: $space;
 }
 
+.layout {
+    display: flex;
+    flex: 1 1 auto;
+    min-height: 0;
+}
+
+.toolbox {
+    width: 240px;
+    min-width: 180px;
+    max-width: 320px;
+    background: $mew-background;
+    overflow: scroll;
+    max-height: 100%;
+    border-right: 1px solid #444;
+}
+
+.workbench {
+    flex: 1 1 auto;
+    background: $mew-background;
+    overflow: auto;
+    height: 100%;
+    border-radius: $space;
+}
+
+
+.buttonBar {
+    padding: 8px;
+    background: #202228;
+    border-top: 1px solid #444;
+    display: flex;
+    gap: 8px;
+}
 
 .button {
     height: 2rem;
@@ -84,4 +116,20 @@ $border-radius: 0.25rem;
     max-width: 100%;
     max-height: 100%;
     /*min-width: 1.5rem;*/
+}
+
+.node {
+    padding: 0.75rem;
+    border-radius: $border-radius;
+    background: #2499ff;
+    border: 1px solid #444;
+}
+
+.toolboxItem {
+    padding: 0.5rem;
+    cursor: grab;
+}
+
+.toolboxItem:active {
+    cursor: grabbing;
 }
