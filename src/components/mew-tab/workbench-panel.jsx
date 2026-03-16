@@ -10,11 +10,11 @@ import {
 
 const WorkbenchPanel = () => {
     const [graph, setGraph] = useState(createEmptyGraph);
+    const [draggingNodeId, setDraggingNodeId] = useState(null);
     const workbenchRef = useRef(null);
 
-    const [draggingNodeId, setDraggingNodeId] = useState(null);
-    const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
-    const [dragPreviewPos, setDragPreviewPos] = useState(null);
+    // Active in-workbench drag session (pointer-based)
+    const dragRef = useRef(null);
 
     const edges = useMemo(() => deriveEdges(graph.nodes), [graph.nodes]);
 
@@ -49,82 +49,68 @@ const WorkbenchPanel = () => {
         }));
     };
 
-    const moveNodeToPosition = (nodeId, clientX, clientY) => {
-        const { x: localX, y: localY } = toLocalCoords(clientX, clientY);
-
+    const moveNodeToPosition = (nodeId, x, y) => {
         setGraph(prev => ({
             ...prev,
-            nodes: prev.nodes.map(n => (n.id === nodeId ? { ...n, x: localX, y: localY } : n)),
-            meta: { ...prev.meta, updatedAt: new Date().toISOString() }
+            nodes: prev.nodes.map(n => (n.id === nodeId ? { ...n, x, y } : n))
         }));
     };
 
-    const clearDragPreview = () => {
-        setDraggingNodeId(null);
-        setDragOffset({ x: 0, y: 0 });
-        setDragPreviewPos(null);
-    };
+    // Pointer-based drag for existing workbench nodes
+    const handleNodePointerDown = (event, node) => {
+        // Allow interacting with controls inside a node
+        const interactive = event.target.closest('input, textarea, select, button, [contenteditable="true"]');
+        if (interactive) return;
 
-    const handleNodeDragStart = (event, node) => {
-        const rect = event.currentTarget.getBoundingClientRect();
-        const dragOffsetX = event.clientX - rect.left;
-        const dragOffsetY = event.clientY - rect.top;
-
+        event.preventDefault();
         setDraggingNodeId(node.id);
-        setDragOffset({ x: dragOffsetX, y: dragOffsetY });
-        setDragPreviewPos({ x: node.x, y: node.y });
 
-        event.dataTransfer.setData(
-            'application/x-mew-existing-node',
-            JSON.stringify({ nodeId: node.id, dragOffsetX, dragOffsetY })
-        );
-        event.dataTransfer.effectAllowed = 'move';
+        dragRef.current = {
+            nodeId: node.id,
+            startClientX: event.clientX,
+            startClientY: event.clientY,
+            startNodeX: node.x,
+            startNodeY: node.y
+        };
+
+        const onPointerMove = (moveEvent) => {
+            const active = dragRef.current;
+            if (!active) return;
+
+            const dx = moveEvent.clientX - active.startClientX;
+            const dy = moveEvent.clientY - active.startClientY;
+
+            moveNodeToPosition(
+                active.nodeId,
+                active.startNodeX + dx,
+                active.startNodeY + dy
+            );
+        };
+
+        const onPointerUp = () => {
+            dragRef.current = null;
+            setDraggingNodeId(null);
+            setGraph(prev => ({
+                ...prev,
+                meta: { ...prev.meta, updatedAt: new Date().toISOString() }
+            }));
+            window.removeEventListener('pointermove', onPointerMove);
+            window.removeEventListener('pointerup', onPointerUp);
+        };
+
+        window.addEventListener('pointermove', onPointerMove);
+        window.addEventListener('pointerup', onPointerUp);
     };
 
     const handleDragOver = event => {
+        // keep HTML5 DnD for toolbox -> workbench
         event.preventDefault();
-        const types = Array.from(event.dataTransfer.types || []);
-        const isExisting = types.includes('application/x-mew-existing-node');
-
-        event.dataTransfer.dropEffect = isExisting ? 'move' : 'copy';
-
-        // live-follow preview for existing node drags
-        if (isExisting && draggingNodeId) {
-            const { x, y } = toLocalCoords(
-                event.clientX - dragOffset.x,
-                event.clientY - dragOffset.y
-            );
-            setDragPreviewPos({ x, y });
-        }
+        event.dataTransfer.dropEffect = 'copy';
     };
 
     const handleDrop = event => {
         event.preventDefault();
 
-        // 1) Move existing workbench node
-        const existingRaw = event.dataTransfer.getData('application/x-mew-existing-node');
-        if (existingRaw) {
-            try {
-                const parsed = JSON.parse(existingRaw);
-                const nodeId = parsed.nodeId;
-                const dragOffsetX = Number(parsed.dragOffsetX) || 0;
-                const dragOffsetY = Number(parsed.dragOffsetY) || 0;
-
-                if (nodeId) {
-                    moveNodeToPosition(
-                        nodeId,
-                        event.clientX - dragOffsetX,
-                        event.clientY - dragOffsetY
-                    );
-                    clearDragPreview();
-                    return;
-                }
-            } catch {
-                // continue to new-node flow
-            }
-        }
-
-        // 2) Create new node from toolbox
         let nodeType = '';
         let dragOffsetX = 0;
         let dragOffsetY = 0;
@@ -141,10 +127,7 @@ const WorkbenchPanel = () => {
             }
         }
 
-        if (!nodeType) {
-            nodeType = event.dataTransfer.getData('text/plain');
-        }
-
+        if (!nodeType) nodeType = event.dataTransfer.getData('text/plain');
         if (!nodeType) return;
 
         addNodeAtPosition(
@@ -164,9 +147,14 @@ const WorkbenchPanel = () => {
             {graph.nodes.map(node => (
                 <div
                     key={node.id}
-                    draggable
-                    onDragStart={event => handleNodeDragStart(event, node)}
-                    style={{ position: 'absolute', left: node.x, top: node.y }}
+                    onPointerDown={event => handleNodePointerDown(event, node)}
+                    className={`${styles.workbenchNode} ${draggingNodeId === node.id ? styles.nodeDragging : ''}`}
+                    style={{
+                        position: 'absolute',
+                        left: node.x,
+                        top: node.y,
+                        touchAction: 'none'
+                    }}
                 >
                     <Node type={node.type} modules={NODE_DEFINITIONS[node.type] || []} />
                 </div>
