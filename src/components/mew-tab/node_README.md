@@ -141,3 +141,37 @@ needs to change; new node types “just work” once the catalog entry exists.
         }
       }
     ```
+
+
+# workbench
+
+## Defining the source-of-truth graph state
+
+```json
+{
+  "nodes": [
+    {
+      "id": "n1",
+      "type": "agent",
+      "x": 120,
+      "y": 80,
+      "inputs": {
+        "in_text": []
+      },
+      "outputs": {
+        "out_text": [
+          { "nodeId": "n2", "portId": "in_text" }
+        ]
+      },
+      "data": {}
+    }
+  ],
+  "viewport": { "panX": 0, "panY": 0, "zoom": 1 },
+  "meta": { "version": 1, "updatedAt": "2026-03-16T00:00:00.000Z" }
+}
+```
+
+Notes:
+- `edges` are **derived** from `nodes[].outputs`.
+- Connection endpoint format is `{ nodeId, portId }` (not nodeId alone).
+- `outputs` is the write-source for connections; `inputs` may be derived/validated.

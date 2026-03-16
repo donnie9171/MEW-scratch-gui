@@ -4,20 +4,21 @@ import { NODE_DEFINITIONS } from './nodeCatalog';
 import styles from './mew-tab.css';
 
 const ToolboxPanel = () => {
-    const touchDataRef = useRef(null);
 
     const handleDragStart = (event, nodeType) => {
-        event.dataTransfer.setData('text/plain', nodeType);
-    };
+        const rect = event.currentTarget.getBoundingClientRect();
+        const dragOffsetX = event.clientX - rect.left;
+        const dragOffsetY = event.clientY - rect.top;
 
-    const handleTouchStart = (event, nodeType) => {
-        touchDataRef.current = nodeType;
-        event.target.style.opacity = '0.7';
-    };
+        const payload = JSON.stringify({
+            nodeType,
+            dragOffsetX,
+            dragOffsetY
+        });
 
-    const handleTouchEnd = (event) => {
-        event.target.style.opacity = '1';
-        touchDataRef.current = null;
+        event.dataTransfer.setData('application/x-mew-node', payload);
+        event.dataTransfer.setData('text/plain', nodeType); // fallback
+        event.dataTransfer.effectAllowed = 'copy';
     };
 
     return (
@@ -27,8 +28,6 @@ const ToolboxPanel = () => {
                     key={nodeType}
                     draggable
                     onDragStart={(event) => handleDragStart(event, nodeType)}
-                    onTouchStart={(event) => handleTouchStart(event, nodeType)}
-                    onTouchEnd={handleTouchEnd}
                     className={styles.toolboxItem}
                 >
                     <Node

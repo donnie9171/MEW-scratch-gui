@@ -41,19 +41,25 @@ $border-radius: 0.25rem;
     min-width: 180px;
     max-width: 320px;
     background: $mew-background;
-    overflow: scroll;
+    overflow-y: scroll;
     max-height: 100%;
     border-right: 1px solid #444;
 }
 
 .workbench {
+    position: relative; /* anchor absolute node positions to workbench */
     flex: 1 1 auto;
-    background: $mew-background;
+    min-height: 0;
     overflow: auto;
-    height: 100%;
-    border-radius: $space;
+    background: $mew-background;
 }
 
+.dragPreview {
+    pointer-events: none;
+    opacity: 0.7;
+    filter: drop-shadow(0 6px 14px rgba(0, 0, 0, 0.35));
+    z-index: 20;
+}
 
 .buttonBar {
     padding: 8px;
