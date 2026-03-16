@@ -5,7 +5,19 @@
 
 export const NODE_DEFINITIONS = {
     Agent: [
-        { id: 'name', type: 'textInput', props: { label: 'Name', placeholder: 'Agent name' } },
+        { 
+            id: 'name', 
+            type: 'textInput', 
+            props: { label: 'Name', placeholder: 'Agent name' }, 
+            io: { 
+                input: { 
+                    portId: 'in_value' 
+                }, 
+                output: { 
+                    portId: 'out_value' 
+                } 
+            } 
+        },
         {
             id: 'model',
             type: 'dropdown',
@@ -17,6 +29,11 @@ export const NODE_DEFINITIONS = {
                 ],
                 placeholder: 'Choose a model',
             },
+            io: { 
+                input: { 
+                    portId: 'in_value' 
+                }
+            } 
         },
     ],
 

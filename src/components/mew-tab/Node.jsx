@@ -1,5 +1,6 @@
 import React from 'react';
 import { getRowModule } from './row-modules/rowModuleRegistry';
+import RowIO from './row-modules/RowIO';
 import styles from './mew-tab.css';
 
 /**
@@ -17,7 +18,7 @@ import styles from './mew-tab.css';
  * @param {Object} [props.data] - Optional node-level data that can be passed to modules
  * @param {Function} [props.onModuleChange] - Optional callback when a module's data changes
  */
-const Node = ({ id, type, modules = [], data = {}, onModuleChange }) => {
+const Node = ({ id, type, modules = [], data = {}, onModuleChange, onPortPointerDown }) => {
     const handleModuleChange = (moduleId, newValue) => {
         if (onModuleChange) {
             onModuleChange({ nodeId: id, moduleId, newValue });
@@ -28,13 +29,21 @@ const Node = ({ id, type, modules = [], data = {}, onModuleChange }) => {
         <div className={styles.node} data-node-id={id} data-node-type={type}>
             {modules.map((module, index) => {
                 const RowComponent = getRowModule(module.type);
+
                 return (
-                    <RowComponent
-                        key={module.id || index}
-                        id={module.id}
-                        {...module.props}
-                        onChange={(newValue) => handleModuleChange(module.id, newValue)}
-                    />
+                    <div key={module.id || index} className={styles.rowModule}>
+                        <RowIO
+                            nodeId={id}
+                            rowId={module.id}
+                            io={module.io}
+                            onPortPointerDown={onPortPointerDown}
+                        />
+                        <RowComponent
+                            id={module.id}
+                            {...module.props}
+                            onChange={(newValue) => handleModuleChange(module.id, newValue)}
+                        />
+                    </div>
                 );
             })}
         </div>
