@@ -160,7 +160,7 @@ needs to change; new node types “just work” once the catalog entry exists.
       },
       "outputs": {
         "out_text": [
-          { "nodeId": "n2", "portId": "in_text" }
+          { "nodeId": "n2", "portId": "in_text" } // portIds should be unique per node
         ]
       },
       "data": {}

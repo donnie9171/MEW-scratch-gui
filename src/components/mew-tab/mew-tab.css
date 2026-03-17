@@ -113,6 +113,30 @@ $border-radius: 0.25rem;
     display: none;
 }
 
+.connectionsLayer {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    z-index: 5;
+}
+
+.connectionPath {
+    fill: none;
+    stroke: #ffffff;
+    stroke-width: 4;
+}
+
+.tempConnectionPath {
+    fill: none;
+    stroke: #ffab19;
+    stroke-width: 4;
+    stroke-dasharray: 5 5;
+}
+
+.nodePoint.active {
+    box-shadow: 0 0 0 3px rgba(255, 171, 25, 0.35);
+}
+
 /* Transparent scrollbars for all elements */
 ::-webkit-scrollbar {
     width: 12px;

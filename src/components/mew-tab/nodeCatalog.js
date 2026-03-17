@@ -31,7 +31,7 @@ export const NODE_DEFINITIONS = {
             },
             io: { 
                 input: { 
-                    portId: 'in_value' 
+                    portId: 'agent_in_value' 
                 }
             } 
         },

@@ -11,9 +11,9 @@ import {
 const WorkbenchPanel = () => {
     const [graph, setGraph] = useState(createEmptyGraph);
     const [draggingNodeId, setDraggingNodeId] = useState(null);
+    const [connecting, setConnecting] = useState(null);
+    const connectingRef = useRef(null); 
     const workbenchRef = useRef(null);
-
-    // Active in-workbench drag session (pointer-based)
     const dragRef = useRef(null);
 
     const edges = useMemo(() => deriveEdges(graph.nodes), [graph.nodes]);
@@ -22,11 +22,122 @@ const WorkbenchPanel = () => {
         const rect = workbenchRef.current?.getBoundingClientRect();
         const scrollLeft = workbenchRef.current?.scrollLeft || 0;
         const scrollTop = workbenchRef.current?.scrollTop || 0;
-
         return {
             x: rect ? clientX - rect.left + scrollLeft : clientX,
             y: rect ? clientY - rect.top + scrollTop : clientY
         };
+    };
+
+    const getPortCenter = (nodeId, portId, direction) => {
+        const wb = workbenchRef.current;
+        if (!wb) return null;
+        const rect = wb.getBoundingClientRect();
+        const el = wb.querySelector(
+            `[data-node-id="${nodeId}"][data-port-id="${portId}"][data-port-direction="${direction}"]`
+        );
+        if (!el) return null;
+        const r = el.getBoundingClientRect();
+        return {
+            x: r.left - rect.left + wb.scrollLeft + (r.width / 2),
+            y: r.top - rect.top + wb.scrollTop + (r.height / 2)
+        };
+    };
+
+    const bezierPath = (p1, p2) => {
+        const dx = Math.abs(p2.x - p1.x) * 0.5;
+        return `M ${p1.x} ${p1.y} C ${p1.x + dx} ${p1.y}, ${p2.x - dx} ${p2.y}, ${p2.x} ${p2.y}`;
+    };
+
+    const connectPorts = (fromNodeId, fromPortId, toNodeId, toPortId) => {
+        if (fromNodeId === toNodeId) return;
+        setGraph(prev => {
+            const nodes = prev.nodes.map(n => {
+                if (n.id === fromNodeId) {
+                    const outputs = { ...(n.outputs || {}) };
+                    const list = [...(outputs[fromPortId] || [])];
+                    const exists = list.some(t => t.nodeId === toNodeId && t.portId === toPortId);
+                    if (!exists) list.push({ nodeId: toNodeId, portId: toPortId });
+                    outputs[fromPortId] = list;
+                    return { ...n, outputs };
+                }
+                if (n.id === toNodeId) {
+                    const inputs = { ...(n.inputs || {}) };
+                    const list = [...(inputs[toPortId] || [])];
+                    const exists = list.some(t => t.nodeId === fromNodeId && t.portId === fromPortId);
+                    if (!exists) list.push({ nodeId: fromNodeId, portId: fromPortId });
+                    inputs[toPortId] = list;
+                    return { ...n, inputs };
+                }
+                return n;
+            });
+            return {
+                ...prev,
+                nodes,
+                meta: { ...prev.meta, updatedAt: new Date().toISOString() }
+            };
+        });
+    };
+
+    const clearPortActive = () => {
+        const wb = workbenchRef.current;
+        if (!wb) return;
+        wb.querySelectorAll(`.${styles.nodePoint}.active`).forEach(el => el.classList.remove('active'));
+    };
+
+    const handlePortPointerDown = (event, meta) => {
+        if (meta.direction !== 'output') return;
+
+        const sourceEl = event.currentTarget;
+        sourceEl.classList.add('active');
+
+        const startConn = {
+            fromNodeId: meta.nodeId,
+            fromPortId: meta.portId,
+            pointer: toLocalCoords(event.clientX, event.clientY)
+        };
+
+        connectingRef.current = startConn;
+        setConnecting(startConn);
+
+        const onMove = (e) => {
+            const c = connectingRef.current;
+            if (!c) return;
+            const next = { ...c, pointer: toLocalCoords(e.clientX, e.clientY) };
+            connectingRef.current = next;
+            setConnecting(next);
+        };
+
+        const cleanup = () => {
+            connectingRef.current = null;
+            setConnecting(null);
+            clearPortActive();
+            window.removeEventListener('pointermove', onMove);
+            window.removeEventListener('pointerup', onUp);
+        };
+
+        const onUp = (e) => {
+            const c = connectingRef.current;
+            if (!c) return cleanup();
+
+            const target = document
+                .elementFromPoint(e.clientX, e.clientY)
+                ?.closest('[data-port-direction="input"]');
+
+            if (target) {
+                const toNodeId = target.getAttribute('data-node-id');
+                const toPortId = target.getAttribute('data-port-id');
+                if (toNodeId && toPortId) {
+                    connectPorts(c.fromNodeId, c.fromPortId, toNodeId, toPortId);
+                    target.classList.add('active');
+                    setTimeout(() => target.classList.remove('active'), 250);
+                }
+            }
+
+            cleanup();
+        };
+
+        window.addEventListener('pointermove', onMove);
+        window.addEventListener('pointerup', onUp);
     };
 
     const addNodeAtPosition = (nodeType, clientX, clientY) => {
@@ -138,31 +249,48 @@ const WorkbenchPanel = () => {
     };
 
     return (
-        <div
-            ref={workbenchRef}
-            className={styles.workbench}
-            onDragOver={handleDragOver}
-            onDrop={handleDrop}
-        >
+        <div ref={workbenchRef} className={styles.workbench} onDragOver={handleDragOver} onDrop={handleDrop}>
+            <svg
+                className={styles.connectionsLayer}
+                width={workbenchRef.current?.scrollWidth || 0}
+                height={workbenchRef.current?.scrollHeight || 0}
+            >
+                {edges.map(edge => {
+                    const p1 = getPortCenter(edge.fromNodeId, edge.fromPortId, 'output');
+                    const p2 = getPortCenter(edge.toNodeId, edge.toPortId, 'input');
+                    if (!p1 || !p2) return null;
+                    return <path key={edge.id} className={styles.connectionPath} d={bezierPath(p1, p2)} />;
+                })}
+
+                {connecting && (() => {
+                    const from = getPortCenter(connecting.fromNodeId, connecting.fromPortId, 'output');
+                    if (!from) return null;
+                    return (
+                        <path
+                            className={styles.tempConnectionPath}
+                            d={bezierPath(from, connecting.pointer)}
+                        />
+                    );
+                })()}
+            </svg>
+
             {graph.nodes.map(node => (
                 <div
                     key={node.id}
                     onPointerDown={event => handleNodePointerDown(event, node)}
                     className={`${styles.workbenchNode} ${draggingNodeId === node.id ? styles.nodeDragging : ''}`}
-                    style={{
-                        position: 'absolute',
-                        left: node.x,
-                        top: node.y,
-                        touchAction: 'none'
-                    }}
+                    style={{ position: 'absolute', left: node.x, top: node.y, touchAction: 'none' }}
                 >
-                    <Node type={node.type} modules={NODE_DEFINITIONS[node.type] || []} />
+                    <Node
+                        id={node.id}
+                        type={node.type}
+                        modules={NODE_DEFINITIONS[node.type] || []}
+                        onPortPointerDown={handlePortPointerDown}
+                    />
                 </div>
             ))}
 
-            <button onClick={() => console.log(serializeGraph(graph))}>
-                Export graph JSON
-            </button>
+            <button onClick={() => console.log(serializeGraph(graph))}>Export graph JSON</button>
             <div>Derived edges: {edges.length}</div>
         </div>
     );
