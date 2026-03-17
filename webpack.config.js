@@ -76,6 +76,10 @@ const baseConfig = new ScratchWebpackConfigBuilder(
                 context: 'node_modules/scratch-vm/dist/web',
                 from: 'extension-worker.{js,js.map}',
                 noErrorOnMissing: true
+            },
+            {
+                from: 'CNAME',  // copy repo-root CNAME to the build root
+                to: '.'
             }
         ]
     }));
