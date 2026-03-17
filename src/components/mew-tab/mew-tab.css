@@ -123,13 +123,13 @@ $border-radius: 0.25rem;
 .connectionPath {
     fill: none;
     stroke: #ffffff;
-    stroke-width: 4;
+    stroke-width: 2.5;
 }
 
 .tempConnectionPath {
     fill: none;
     stroke: #ffab19;
-    stroke-width: 4;
+    stroke-width: 2.5;
     stroke-dasharray: 5 5;
 }
 
