@@ -1,22 +1,81 @@
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import Node from './Node';
 import { NODE_DEFINITIONS } from './nodeCatalog';
 import styles from './mew-tab.css';
 import {
     createEmptyGraph,
     deriveEdges,
-    serializeGraph
+    serializeGraph,
+    deserializeGraph
 } from './workbench/graphState';
 
+const PROJECT_STORAGE_KEY = 'mew.project.graph.v1';
+
+const loadInitialGraph = () => {
+    if (typeof window === 'undefined') return createEmptyGraph();
+
+    try {
+        const raw = window.localStorage.getItem(PROJECT_STORAGE_KEY);
+        if (!raw) return createEmptyGraph();
+        return deserializeGraph(raw);
+    } catch {
+        return createEmptyGraph();
+    }
+};
+
 const WorkbenchPanel = () => {
-    const [graph, setGraph] = useState(createEmptyGraph);
+    const [graph, setGraph] = useState(loadInitialGraph);
     const [draggingNodeId, setDraggingNodeId] = useState(null);
     const [connecting, setConnecting] = useState(null);
-    const connectingRef = useRef(null); 
+    const connectingRef = useRef(null);
     const workbenchRef = useRef(null);
     const dragRef = useRef(null);
 
+    const [overlaySize, setOverlaySize] = useState({ width: 1, height: 1 });
+    const [layoutVersion, setLayoutVersion] = useState(0);
+
     const edges = useMemo(() => deriveEdges(graph.nodes), [graph.nodes]);
+
+
+    useEffect(() => {
+        try {
+            window.localStorage.setItem(PROJECT_STORAGE_KEY, serializeGraph(graph));
+        } catch {
+            // ignore storage errors (quota/private mode)
+        }
+    }, [graph]);
+
+    useLayoutEffect(() => {
+        const wb = workbenchRef.current;
+        if (!wb) return;
+
+        const sync = () => {
+            setOverlaySize({
+                width: Math.max(wb.scrollWidth, wb.clientWidth, 1),
+                height: Math.max(wb.scrollHeight, wb.clientHeight, 1)
+            });
+            setLayoutVersion(v => v + 1); // force edge re-measure after layout
+        };
+
+        sync();
+
+        const ro = new ResizeObserver(sync);
+        ro.observe(wb);
+        wb.addEventListener('scroll', sync, { passive: true });
+        window.addEventListener('resize', sync);
+
+        return () => {
+            ro.disconnect();
+            wb.removeEventListener('scroll', sync);
+            window.removeEventListener('resize', sync);
+        };
+    }, []);
+
+    useLayoutEffect(() => {
+        // after nodes/edges change, wait one frame so ports exist in DOM
+        const id = requestAnimationFrame(() => setLayoutVersion(v => v + 1));
+        return () => cancelAnimationFrame(id);
+    }, [graph.nodes, edges.length]);
 
     const toLocalCoords = (clientX, clientY) => {
         const rect = workbenchRef.current?.getBoundingClientRect();
@@ -251,9 +310,10 @@ const WorkbenchPanel = () => {
     return (
         <div ref={workbenchRef} className={styles.workbench} onDragOver={handleDragOver} onDrop={handleDrop}>
             <svg
+                key={layoutVersion}
                 className={styles.connectionsLayer}
-                width={workbenchRef.current?.scrollWidth || 0}
-                height={workbenchRef.current?.scrollHeight || 0}
+                width={overlaySize.width}
+                height={overlaySize.height}
             >
                 {edges.map(edge => {
                     const p1 = getPortCenter(edge.fromNodeId, edge.fromPortId, 'output');
@@ -290,8 +350,8 @@ const WorkbenchPanel = () => {
                 </div>
             ))}
 
-            <button onClick={() => console.log(serializeGraph(graph))}>Export graph JSON</button>
-            <div>Derived edges: {edges.length}</div>
+            {/* <button onClick={() => console.log(serializeGraph(graph))}>Export graph JSON</button>
+            <div>Derived edges: {edges.length}</div> */}
         </div>
     );
 };
