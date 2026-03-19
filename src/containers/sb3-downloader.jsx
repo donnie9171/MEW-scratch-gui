@@ -3,8 +3,10 @@ import PropTypes from 'prop-types';
 import React from 'react';
 import {connect} from 'react-redux';
 import {projectTitleInitialState} from '../reducers/project-title';
+import {getMewGraph} from '../reducers/mew-graph';
 import downloadBlob from '../lib/download-blob';
 import JSZip from 'jszip';
+
 /**
  * Project saver component passes a downloadProject function to its child.
  * It expects this child to be a function with the signature
@@ -26,26 +28,40 @@ class SB3Downloader extends React.Component {
             'downloadProject'
         ]);
     }
+
     async downloadProject () {
         const content = await this.props.saveProjectSb3();
 
-        // Unzip the existing .sb3 blob
-        const zip = await JSZip.loadAsync(content);
+        let blobToDownload = content;
+        try {
+            const zip = await JSZip.loadAsync(content);
+            const projectJsonFile = zip.file('project.json');
 
-        // Add your extra JSON file (replace with your actual payload)
-        const mewSaveData = { foo: 'bar', timestamp: Date.now() }; // Example payload
-        zip.file('mew.json', JSON.stringify(mewSaveData, null, 2));
+            if (projectJsonFile) {
+                const projectJsonRaw = await projectJsonFile.async('string');
+                const projectJson = JSON.parse(projectJsonRaw);
 
-        // Re-zip and create new blob
-        const newBlob = await zip.generateAsync({type: 'blob'});
+                projectJson.meta = projectJson.meta || {};
+                projectJson.meta.mew = {
+                    graphVersion: 1,
+                    graph: this.props.mewGraph || null
+                };
 
-        // Download the new blob
-        downloadBlob(this.props.projectFilename, newBlob);
+                zip.file('project.json', JSON.stringify(projectJson));
+                blobToDownload = await zip.generateAsync({type: 'blob'});
+            }
+        } catch (e) {
+            // fallback: download original sb3 blob
+            blobToDownload = content;
+        }
+
+        downloadBlob(this.props.projectFilename, blobToDownload);
 
         if (this.props.onSaveFinished) {
             this.props.onSaveFinished();
         }
     }
+
     render () {
         const {
             children
@@ -62,23 +78,26 @@ const getProjectFilename = (curTitle, defaultTitle) => {
     if (!filenameTitle || filenameTitle.length === 0) {
         filenameTitle = defaultTitle;
     }
-    return `${filenameTitle.substring(0, 100)}.sb3`; // can consider changing to .mew for distinction from standard scratch files -> would need to change file input handling too
+    return `${filenameTitle.substring(0, 100)}.sb3`;
 };
 
 SB3Downloader.propTypes = {
     children: PropTypes.func,
     className: PropTypes.string,
+    mewGraph: PropTypes.object,
     onSaveFinished: PropTypes.func,
     projectFilename: PropTypes.string,
     saveProjectSb3: PropTypes.func
 };
 SB3Downloader.defaultProps = {
-    className: ''
+    className: '',
+    mewGraph: null
 };
 
 const mapStateToProps = state => ({
     saveProjectSb3: state.scratchGui.vm.saveProjectSb3.bind(state.scratchGui.vm),
-    projectFilename: getProjectFilename(state.scratchGui.projectTitle, projectTitleInitialState)
+    projectFilename: getProjectFilename(state.scratchGui.projectTitle, projectTitleInitialState),
+    mewGraph: getMewGraph(state)
 });
 
 export default connect(

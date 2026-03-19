@@ -5,6 +5,8 @@ import {defineMessages, intlShape, injectIntl} from 'react-intl';
 import {connect} from 'react-redux';
 import log from '../lib/log';
 import sharedMessages from './shared-messages';
+import extractMewGraphFromSb3 from '../lib/extract-mew-graph-from-sb3';
+import {setMewGraph} from '../reducers/mew-graph';
 
 import {
     LoadingStates,
@@ -29,6 +31,12 @@ const messages = defineMessages({
         description: 'An error that displays when a local project file fails to load.'
     }
 });
+
+const EMPTY_MEW_GRAPH = {
+    nodes: [],
+    viewport: {panX: 0, panY: 0, zoom: 1},
+    meta: {version: 1, updatedAt: new Date().toISOString()}
+};
 
 /**
  * Higher Order Component to provide behavior for loading local project files into editor.
@@ -148,9 +156,18 @@ const SBFileUploaderHOC = function (WrappedComponent) {
             if (this.fileReader) {
                 this.props.onLoadingStarted();
                 const filename = this.fileToUpload && this.fileToUpload.name;
+                const projectData = this.fileReader.result;
                 let loadingSuccess = false;
-                this.props.vm.loadProject(this.fileReader.result)
+                let importedMewGraph = null;
+
+                extractMewGraphFromSb3(projectData)
+                    .then(graph => {
+                        importedMewGraph = graph;
+                        return this.props.vm.loadProject(projectData);
+                    })
                     .then(() => {
+                        this.props.onSetMewGraph(importedMewGraph || EMPTY_MEW_GRAPH);
+
                         if (filename) {
                             const uploadedProjectTitle = this.getProjectTitleFromFilename(filename);
                             this.props.onSetProjectTitle(uploadedProjectTitle);
@@ -163,8 +180,6 @@ const SBFileUploaderHOC = function (WrappedComponent) {
                     })
                     .then(() => {
                         this.props.onLoadingFinished(this.props.loadingState, loadingSuccess);
-                        // go back to step 7: whether project loading succeeded
-                        // or failed, reset file objects
                         this.removeFileObjects();
                     });
             }
@@ -191,6 +206,7 @@ const SBFileUploaderHOC = function (WrappedComponent) {
                 onLoadingFinished,
                 onLoadingStarted,
                 onSetProjectTitle,
+                onSetMewGraph,
                 projectChanged,
                 requestProjectUpload: requestProjectUploadProp,
                 userOwnsProject,
@@ -219,6 +235,7 @@ const SBFileUploaderHOC = function (WrappedComponent) {
         onLoadingFinished: PropTypes.func,
         onLoadingStarted: PropTypes.func,
         onSetProjectTitle: PropTypes.func,
+        onSetMewGraph: PropTypes.func,
         projectChanged: PropTypes.bool,
         requestProjectUpload: PropTypes.func,
         userOwnsProject: PropTypes.bool,
@@ -252,6 +269,7 @@ const SBFileUploaderHOC = function (WrappedComponent) {
         // show project loading screen
         onLoadingStarted: () => dispatch(openLoadingProject()),
         onSetProjectTitle: title => dispatch(setProjectTitle(title)),
+        onSetMewGraph: graph => dispatch(setMewGraph(graph)),
         // step 4: transition the project state so we're ready to handle the new
         // project data. When this is done, the project state transition will be
         // noticed by componentDidUpdate()

@@ -2,11 +2,14 @@ import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 're
 import Node from './Node';
 import { NODE_DEFINITIONS } from './nodeCatalog';
 import styles from './mew-tab.css';
+import { connect } from 'react-redux';
+import {setMewGraph, getMewGraph} from '../../reducers/mew-graph';
 import {
     createEmptyGraph,
     deriveEdges,
     serializeGraph,
-    deserializeGraph
+    deserializeGraph,
+    validateGraph
 } from './workbench/graphState';
 
 const PROJECT_STORAGE_KEY = 'mew.project.graph.v1';
@@ -23,8 +26,20 @@ const loadInitialGraph = () => {
     }
 };
 
-const WorkbenchPanel = () => {
-    const [graph, setGraph] = useState(loadInitialGraph);
+const loadLocalGraph = () => {
+    if (typeof window === 'undefined') return null;
+    try {
+        const raw = window.localStorage.getItem(PROJECT_STORAGE_KEY);
+        if (!raw) return null;
+        return deserializeGraph(raw);
+    } catch {
+        return null;
+    }
+};
+
+const WorkbenchPanel = ({ setMewGraph: dispatchSetMewGraph, mewGraph }) => {
+    const [graph, setGraph] = useState(() => mewGraph || loadLocalGraph() || createEmptyGraph());
+    const lastAppliedReduxUpdatedAt = useRef(null);
     const [draggingNodeId, setDraggingNodeId] = useState(null);
     const [connecting, setConnecting] = useState(null);
     const connectingRef = useRef(null);
@@ -36,12 +51,31 @@ const WorkbenchPanel = () => {
 
     const edges = useMemo(() => deriveEdges(graph.nodes), [graph.nodes]);
 
+    // Hydrate from imported project graph when Redux updates
+    useEffect(() => {
+        if (!mewGraph) return;
 
+        const check = validateGraph(mewGraph);
+        if (!check.valid) return;
+
+        const incomingUpdatedAt = mewGraph?.meta?.updatedAt || null;
+        if (incomingUpdatedAt && incomingUpdatedAt === lastAppliedReduxUpdatedAt.current) return;
+
+        lastAppliedReduxUpdatedAt.current = incomingUpdatedAt;
+        setGraph(mewGraph);
+    }, [mewGraph]);
+
+    // Keep Redux in sync with local edits
+    useEffect(() => {
+        dispatchSetMewGraph(graph);
+    }, [dispatchSetMewGraph, graph]);
+
+    // Keep localStorage as fallback cache
     useEffect(() => {
         try {
             window.localStorage.setItem(PROJECT_STORAGE_KEY, serializeGraph(graph));
         } catch {
-            // ignore storage errors (quota/private mode)
+            // ignore
         }
     }, [graph]);
 
@@ -349,11 +383,16 @@ const WorkbenchPanel = () => {
                     />
                 </div>
             ))}
-
-            {/* <button onClick={() => console.log(serializeGraph(graph))}>Export graph JSON</button>
-            <div>Derived edges: {edges.length}</div> */}
         </div>
     );
 };
 
-export default WorkbenchPanel;
+const mapStateToProps = state => ({
+    mewGraph: getMewGraph(state)
+});
+
+const mapDispatchToProps = {
+    setMewGraph
+};
+
+export default connect(mapStateToProps, mapDispatchToProps)(WorkbenchPanel);
