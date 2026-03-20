@@ -115,6 +115,17 @@ const WorkbenchPanel = ({ setMewGraph: dispatchSetMewGraph, mewGraph }) => {
         a.bottom > b.top
     );
 
+    const isTypingTarget = target => {
+        if (!target) return false;
+        const tag = target.tagName?.toLowerCase();
+        return (
+            target.isContentEditable ||
+            tag === 'input' ||
+            tag === 'textarea' ||
+            tag === 'select'
+        );
+    };
+
     const idCounterRef = useRef(0);
 
     const makeNodeId = type => {
@@ -422,6 +433,45 @@ const WorkbenchPanel = ({ setMewGraph: dispatchSetMewGraph, mewGraph }) => {
             // ignore
         }
     }, [graph]);
+
+    useEffect(() => {
+        const onKeyDown = event => {
+            if (isTypingTarget(event.target)) return;
+
+            const key = (event.key || '').toLowerCase();
+            const hasMod = event.metaKey || event.ctrlKey;
+
+            // Delete / Backspace -> delete selected
+            if ((event.key === 'Delete' || event.key === 'Backspace') && selectedNodeIds.length > 0) {
+                event.preventDefault();
+                handleDeleteSelected();
+                return;
+            }
+
+            // Cmd/Ctrl + D -> duplicate selected
+            if (hasMod && key === 'd' && selectedNodeIds.length > 0) {
+                event.preventDefault();
+                handleDuplicateSelected();
+                return;
+            }
+
+            // Esc -> clear selection
+            if (event.key === 'Escape' && selectedNodeIds.length > 0) {
+                event.preventDefault();
+                clearSelection();
+                return;
+            }
+
+            // Cmd/Ctrl + A -> select all nodes (optional from phase plan)
+            if (hasMod && key === 'a') {
+                event.preventDefault();
+                setSelectedNodeIds(graph.nodes.map(n => n.id));
+            }
+        };
+
+        window.addEventListener('keydown', onKeyDown);
+        return () => window.removeEventListener('keydown', onKeyDown);
+    }, [selectedNodeIds, graph.nodes, handleDeleteSelected, handleDuplicateSelected]);
 
     useLayoutEffect(() => {
         const wb = workbenchRef.current;
