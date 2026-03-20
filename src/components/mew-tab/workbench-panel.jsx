@@ -157,18 +157,59 @@ const WorkbenchPanel = ({ setMewGraph: dispatchSetMewGraph, mewGraph }) => {
             idMap[n.id] = makeNodeId(n.type);
         });
 
-        const pairs = sourceNodes.map(orig => ({
-            orig,
-            clone: {
+        // Rolling graph snapshot so uniqueness increments across this duplicate batch.
+        const workingGraph = {
+            ...graph,
+            nodes: [...graph.nodes]
+        };
+
+        const pairs = sourceNodes.map(orig => {
+            const definition = getNodeDefinition(orig.type);
+
+            // Preserve existing data by default.
+            const nextData = JSON.parse(JSON.stringify(orig.data || {}));
+
+            // Re-resolve only unique-like rules on duplicate.
+            const defaults = definition?.defaults;
+            const rules = Array.isArray(defaults?.rules) ? defaults.rules : [];
+            const uniqueRules = rules.filter(r => r && (r.type === 'template' || r.type === 'sequence'));
+
+            if (uniqueRules.length) {
+                const uniqueResolved = resolveNodeDefaults({
+                    nodeType: orig.type,
+                    definition: {
+                        ...definition,
+                        defaults: {
+                            ...(defaults || {}),
+                            rules: uniqueRules
+                        }
+                    },
+                    graph: workingGraph
+                });
+
+                Object.entries(uniqueResolved).forEach(([rowId, rowPatch]) => {
+                    nextData[rowId] = {
+                        ...(nextData[rowId] || {}),
+                        ...rowPatch
+                    };
+                });
+            }
+
+            const clone = {
                 ...orig,
                 id: idMap[orig.id],
                 x: orig.x + 24,
                 y: orig.y + 24,
-                data: JSON.parse(JSON.stringify(orig.data || {})),
+                data: nextData,
                 inputs: {},
                 outputs: {}
-            }
-        }));
+            };
+
+            // Add clone immediately so later clones see its names/values for uniqueness checks.
+            workingGraph.nodes.push(clone);
+
+            return {orig, clone};
+        });
 
         // Keep only internal edges among selected nodes, remapped to cloned ids.
         pairs.forEach(pair => {
