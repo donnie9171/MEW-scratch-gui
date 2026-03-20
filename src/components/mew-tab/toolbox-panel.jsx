@@ -22,7 +22,10 @@ const ToolboxPanel = () => {
     };
 
     return (
-        <div className={styles.toolbox}>
+        <div
+            className={styles.toolbox}
+            data-mew-toolbox-dropzone="true"
+        >
             {Object.keys(NODE_DEFINITIONS).map((nodeType) => (
                 <div
                     key={nodeType}

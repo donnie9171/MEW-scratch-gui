@@ -136,6 +136,42 @@ $border-radius: 0.25rem;
 .nodePoint.active {
     box-shadow: 0 0 0 3px rgba(255, 171, 25, 0.35);
 }
+.nodeDragging {
+    cursor: grabbing;
+    filter: drop-shadow(0 10px 22px rgba(0, 0, 0, 0.45));
+    z-index: 9999; /* make sure dragged node renders above toolbox */
+}
+
+.nodeOverDeleteZone {
+    transform: scale(0.96);
+    opacity: 0.92;
+}
+
+.nodeDeleting {
+    z-index: 10000;
+    animation: nodeDeleteShrink 170ms ease-out forwards;
+    pointer-events: none;
+}
+
+.dragPortalNode {
+    position: fixed;
+    z-index: 2147483647; /* above toolbox and app chrome */
+    pointer-events: none;
+    filter: drop-shadow(0 10px 22px rgba(0, 0, 0, 0.45));
+}
+
+@keyframes nodeDeleteShrink {
+    from {
+        transform: scale(1);
+        opacity: 1;
+        filter: drop-shadow(0 10px 22px rgba(0, 0, 0, 0.45));
+    }
+    to {
+        transform: scale(0.6);
+        opacity: 0;
+        filter: drop-shadow(0 0 0 rgba(0, 0, 0, 0));
+    }
+}
 
 /* Transparent scrollbars for all elements */
 ::-webkit-scrollbar {
