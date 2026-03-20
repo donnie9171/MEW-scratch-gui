@@ -143,8 +143,11 @@ $border-radius: 0.25rem;
 }
 
 .nodeOverDeleteZone {
-    transform: scale(0.96);
-    opacity: 0.92;
+    transform: scale(1);
+    opacity: 1;
+    outline: 2px solid #ff1919;
+    outline-offset: 2px;
+    border-radius: 10px;
 }
 
 .nodeDeleting {
@@ -155,9 +158,14 @@ $border-radius: 0.25rem;
 
 .dragPortalNode {
     position: fixed;
-    z-index: 2147483647; /* above toolbox and app chrome */
+    z-index: 2147483647;
     pointer-events: none;
     filter: drop-shadow(0 10px 22px rgba(0, 0, 0, 0.45));
+
+    /* Match workbench typography so preview size is identical */
+    font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+    font-size: 0.85rem;
+    line-height: 1.2;
 }
 
 .nodeSelected {
@@ -321,8 +329,27 @@ $border-radius: 0.25rem;
 }
 
 .toolboxItem {
-    padding: 0.5rem;
+    padding: 0;              /* remove ghost padding */
+    margin: 0.5rem;          /* keep visual spacing in toolbox list */
+    background: transparent;
     cursor: grab;
+    display: flex;
+    align-items: flex-start;
+    /* Match workbench typography so preview size is identical */
+    font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+    font-size: 0.85rem;
+    line-height: 1.2;
+}
+
+.toolboxItem .node {
+    display: inline-block;      /* match workbench "content-sized" look */
+    width: auto;
+    max-width: none;
+    box-sizing: border-box;
+}
+
+.toolboxItem .rowModule {
+    min-height: 28px;           /* keep row height aligned with workbench */
 }
 
 .toolboxItem:active {

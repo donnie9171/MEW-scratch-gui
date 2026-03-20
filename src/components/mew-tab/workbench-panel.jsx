@@ -57,7 +57,7 @@ const WorkbenchPanel = ({
     const connectingRef = useRef(null);
     const workbenchRef = useRef(null);
     const dragRef = useRef(null);
-    const [dragPreview, setDragPreview] = useState(null);
+    const [dragPreviews, setDragPreviews] = useState([]);
     const dragOverToolboxRef = useRef(false);
 
 
@@ -125,6 +125,29 @@ const WorkbenchPanel = ({
         a.top < b.bottom &&
         a.bottom > b.top
     );
+
+    const buildGroupPreviews = (active, dx, dy, deleting = false) => {
+        const wb = workbenchRef.current;
+        if (!wb) return [];
+        const wbRect = wb.getBoundingClientRect();
+
+        return (active.draggedNodeIds || []).map(nodeId => {
+            const start = active.startPositions[nodeId];
+            const node = graph.nodes.find(n => n.id === nodeId);
+            if (!start || !node) return null;
+
+            const localX = start.x + dx;
+            const localY = start.y + dy;
+
+            return {
+                nodeId,
+                nodeType: node.type,
+                x: wbRect.left - wb.scrollLeft + localX,
+                y: wbRect.top - wb.scrollTop + localY,
+                deleting
+            };
+        }).filter(Boolean);
+    };
 
     useEffect(() => {
         const checkpoint = !suppressNextCheckpointRef.current;
@@ -267,6 +290,17 @@ const WorkbenchPanel = ({
         setSelectedNodeIds(clonedNodes.map(n => n.id));
     };
 
+    const getLeftmostNodeFromIds = nodeIds => {
+        const selected = graph.nodes.filter(n => nodeIds.includes(n.id));
+        if (!selected.length) return null;
+        return selected.reduce((leftmost, n) => {
+            if (!leftmost) return n;
+            if (n.x < leftmost.x) return n;
+            if (n.x === leftmost.x && n.y < leftmost.y) return n;
+            return leftmost;
+        }, null);
+    };
+
 
     const beginDragForNodes = (event, anchorNode, draggedNodeIds) => {
         // checkpoint BEFORE position mutations so one undo restores original positions
@@ -277,10 +311,13 @@ const WorkbenchPanel = ({
 
         setDraggingNodeId(anchorNode.id);
 
-        const anchorEl = workbenchRef.current?.querySelector(
-            `[data-workbench-node-id="${anchorNode.id}"]`
+        // Always use leftmost node as delete reference for group drag consistency
+        const deleteRefNode = getLeftmostNodeFromIds(draggedNodeIds) || anchorNode;
+
+        const deleteRefEl = workbenchRef.current?.querySelector(
+            `[data-workbench-node-id="${deleteRefNode.id}"]`
         );
-        const rect = (anchorEl || event.currentTarget).getBoundingClientRect();
+        const rect = (deleteRefEl || event.currentTarget).getBoundingClientRect();
 
         const offsetX = event.clientX - rect.left;
         const offsetY = event.clientY - rect.top;
@@ -292,7 +329,7 @@ const WorkbenchPanel = ({
             }
         }
 
-        setDragPreview(null);
+        setDragPreviews([]);
         dragOverToolboxRef.current = false;
         setDragOverToolbox(false);
 
@@ -306,7 +343,9 @@ const WorkbenchPanel = ({
             offsetX,
             offsetY,
             width: rect.width,
-            height: rect.height
+            height: rect.height,
+            deleteRefNodeId: deleteRefNode.id,
+            deleteRefNodeType: deleteRefNode.type
         };
 
         const onPointerMove = moveEvent => {
@@ -318,6 +357,7 @@ const WorkbenchPanel = ({
 
             moveDraggedNodesByDelta(active.draggedNodeIds, active.startPositions, dx, dy);
 
+            // overlap/delete reference is ALWAYS leftmost node
             const nodeRect = {
                 left: moveEvent.clientX - active.offsetX,
                 top: moveEvent.clientY - active.offsetY,
@@ -328,23 +368,14 @@ const WorkbenchPanel = ({
             const toolboxEl = document.querySelector('[data-mew-toolbox-dropzone="true"]');
             const toolboxRect = toolboxEl ? toolboxEl.getBoundingClientRect() : null;
             const isOverToolbox = toolboxRect ? isRectOverlapping(nodeRect, toolboxRect) : false;
-
             if (isOverToolbox !== dragOverToolboxRef.current) {
                 dragOverToolboxRef.current = isOverToolbox;
                 setDragOverToolbox(isOverToolbox);
-                if (!isOverToolbox) setDragPreview(null);
+                if (!isOverToolbox) setDragPreviews([]);
             }
 
             if (isOverToolbox) {
-                setDragPreview(prev => ({
-                    nodeId: active.nodeId,
-                    nodeType: active.nodeType,
-                    x: nodeRect.left,
-                    y: nodeRect.top,
-                    offsetX: active.offsetX,
-                    offsetY: active.offsetY,
-                    deleting: prev?.deleting || false
-                }));
+                setDragPreviews(buildGroupPreviews(active, dx, dy, false));
             }
         };
 
@@ -369,30 +400,21 @@ const WorkbenchPanel = ({
 
             if (droppedInToolbox) {
                 const idsToDelete = active?.draggedNodeIds || [anchorNode.id];
-                setDeletingNodeId(anchorNode.id);
+                setDeletingNodeId(active?.deleteRefNodeId || anchorNode.id);
 
-                setDragPreview(prev => prev || {
-                    nodeId: active?.nodeId || anchorNode.id,
-                    nodeType: active?.nodeType || anchorNode.type,
-                    x: nodeRect.left,
-                    y: nodeRect.top,
-                    offsetX: active?.offsetX || 0,
-                    offsetY: active?.offsetY || 0,
-                    deleting: false
-                });
-                setDragPreview(prev => (prev ? ({...prev, deleting: true}) : prev));
+                const dx = upEvent.clientX - active.startClientX;
+                const dy = upEvent.clientY - active.startClientY;
+                setDragPreviews(buildGroupPreviews(active, dx, dy, true));
 
                 window.setTimeout(() => {
-                    // Treat drag->delete as part of same undo unit as the drag.
                     suppressNextCheckpointRef.current = true;
-
                     removeNodesAndEdges(idsToDelete);
                     setSelectedNodeIds(prev => prev.filter(id => !idsToDelete.includes(id)));
                     setDeletingNodeId(null);
-                    setDragPreview(null);
+                    setDragPreviews([]);
                 }, 170);
             } else {
-                setDragPreview(null);
+                setDragPreviews([]);
                 setGraph(prev => ({
                     ...prev,
                     meta: {...prev.meta, updatedAt: new Date().toISOString()}
@@ -958,7 +980,8 @@ const WorkbenchPanel = ({
                         left: node.x,
                         top: node.y,
                         touchAction: 'none',
-                        visibility: (draggingNodeId === node.id && dragOverToolbox) ? 'hidden' : 'visible'
+                        // keep original hidden for entire preview lifecycle (including delete animation)
+                        visibility: dragPreviews.some(p => p.nodeId === node.id) ? 'hidden' : 'visible'
                     }}
                 >
                     <Node
@@ -1031,21 +1054,29 @@ const WorkbenchPanel = ({
                 </div>
             )}
 
-            {/* preview only exists while over toolbox (or delete animation) */}
-            {dragPreview && ReactDOM.createPortal(
-                <div
-                    className={`${styles.dragPortalNode} ${dragPreview.deleting ? styles.nodeDeleting : ''}`}
-                    style={{ left: dragPreview.x, top: dragPreview.y }}
-                >
-                    <Node
-                        id={dragPreview.nodeId}
-                        type={dragPreview.nodeType}
-                        modules={getNodeDefinition(dragPreview.nodeType).rows}
-                        data={(graph.nodes.find(n => n.id === dragPreview.nodeId)?.data) || {}}
-                        onModuleChange={() => {}}
-                        onPortPointerDown={() => {}}
-                    />
-                </div>,
+            {dragPreviews.length > 0 && ReactDOM.createPortal(
+                <>
+                    {dragPreviews.map(preview => (
+                        <div
+                            key={preview.nodeId}
+                            className={[
+                                styles.dragPortalNode,
+                                dragOverToolbox ? styles.nodeOverDeleteZone : '',
+                                preview.deleting ? styles.nodeDeleting : ''
+                            ].join(' ')}
+                            style={{left: preview.x, top: preview.y}}
+                        >
+                            <Node
+                                id={preview.nodeId}
+                                type={preview.nodeType}
+                                modules={getNodeDefinition(preview.nodeType).rows}
+                                data={(graph.nodes.find(n => n.id === preview.nodeId)?.data) || {}}
+                                onModuleChange={() => {}}
+                                onPortPointerDown={() => {}}
+                            />
+                        </div>
+                    ))}
+                </>,
                 document.body
             )}
         </div>
