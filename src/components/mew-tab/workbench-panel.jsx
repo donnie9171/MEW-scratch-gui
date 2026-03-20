@@ -1,7 +1,8 @@
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import ReactDOM from 'react-dom';
 import Node from './Node';
-import { NODE_DEFINITIONS } from './nodeCatalog';
+import { getNodeDefinition } from './nodeCatalog';
+import { resolveNodeDefaults } from './workbench/defaultValueRules';
 import styles from './mew-tab.css';
 import { connect } from 'react-redux';
 import {setMewGraph, getMewGraph} from '../../reducers/mew-graph';
@@ -281,21 +282,30 @@ const WorkbenchPanel = ({ setMewGraph: dispatchSetMewGraph, mewGraph }) => {
     const addNodeAtPosition = (nodeType, clientX, clientY) => {
         const { x: localX, y: localY } = toLocalCoords(clientX, clientY);
 
-        const newNode = {
-            id: `${nodeType}-${Date.now()}`,
-            type: nodeType,
-            x: localX,
-            y: localY,
-            inputs: {},
-            outputs: {},
-            data: {}
-        };
+        setGraph(prev => {
+            const definition = getNodeDefinition(nodeType);
+            const initialData = resolveNodeDefaults({
+                nodeType,
+                definition,
+                graph: prev
+            });
 
-        setGraph(prev => ({
-            ...prev,
-            nodes: [...prev.nodes, newNode],
-            meta: { ...prev.meta, updatedAt: new Date().toISOString() }
-        }));
+            const newNode = {
+                id: `${nodeType}-${Date.now()}`,
+                type: nodeType,
+                x: localX,
+                y: localY,
+                inputs: {},
+                outputs: {},
+                data: initialData
+            };
+
+            return {
+                ...prev,
+                nodes: [...prev.nodes, newNode],
+                meta: { ...prev.meta, updatedAt: new Date().toISOString() }
+            };
+        });
     };
 
     const moveNodeToPosition = (nodeId, x, y) => {
@@ -474,6 +484,26 @@ const WorkbenchPanel = ({ setMewGraph: dispatchSetMewGraph, mewGraph }) => {
         );
     };
 
+    const handleNodeModuleChange = ({nodeId, moduleId, newValue}) => {
+        setGraph(prev => ({
+            ...prev,
+            nodes: prev.nodes.map(n => {
+                if (n.id !== nodeId) return n;
+                return {
+                    ...n,
+                    data: {
+                        ...(n.data || {}),
+                        [moduleId]: {
+                            ...((n.data && n.data[moduleId]) || {}),
+                            value: newValue
+                        }
+                    }
+                };
+            }),
+            meta: { ...prev.meta, updatedAt: new Date().toISOString() }
+        }));
+    };
+
     return (
         <div ref={workbenchRef} className={styles.workbench} onDragOver={handleDragOver} onDrop={handleDrop}>
             <svg
@@ -516,14 +546,15 @@ const WorkbenchPanel = ({ setMewGraph: dispatchSetMewGraph, mewGraph }) => {
                         left: node.x,
                         top: node.y,
                         touchAction: 'none',
-                        // hide original only when preview is active over toolbox
                         visibility: (draggingNodeId === node.id && dragOverToolbox) ? 'hidden' : 'visible'
                     }}
                 >
                     <Node
                         id={node.id}
                         type={node.type}
-                        modules={NODE_DEFINITIONS[node.type] || []}
+                        modules={getNodeDefinition(node.type).rows}
+                        data={node.data || {}}
+                        onModuleChange={handleNodeModuleChange}
                         onPortPointerDown={handlePortPointerDown}
                     />
                 </div>
@@ -538,7 +569,9 @@ const WorkbenchPanel = ({ setMewGraph: dispatchSetMewGraph, mewGraph }) => {
                     <Node
                         id={dragPreview.nodeId}
                         type={dragPreview.nodeType}
-                        modules={NODE_DEFINITIONS[dragPreview.nodeType] || []}
+                        modules={getNodeDefinition(dragPreview.nodeType).rows}
+                        data={(graph.nodes.find(n => n.id === dragPreview.nodeId)?.data) || {}}
+                        onModuleChange={() => {}}
                         onPortPointerDown={() => {}}
                     />
                 </div>,

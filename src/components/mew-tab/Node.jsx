@@ -20,15 +20,18 @@ import styles from './mew-tab.css';
  */
 const Node = ({ id, type, modules = [], data = {}, onModuleChange, onPortPointerDown }) => {
     const handleModuleChange = (moduleId, newValue) => {
-        if (onModuleChange) {
-            onModuleChange({ nodeId: id, moduleId, newValue });
-        }
+        if (onModuleChange) onModuleChange({nodeId: id, moduleId, newValue});
     };
+
+    const moduleList = Array.isArray(modules) ? modules : (modules?.rows || []);
 
     return (
         <div className={styles.node} data-node-id={id} data-node-type={type}>
-            {modules.map((module, index) => {
+            {moduleList.map((module, index) => {
                 const RowComponent = getRowModule(module.type);
+                if (!RowComponent) return null;
+
+                const rowData = data[module.id] || {};
 
                 return (
                     <div key={module.id || index} className={styles.rowModule}>
@@ -41,6 +44,7 @@ const Node = ({ id, type, modules = [], data = {}, onModuleChange, onPortPointer
                         <RowComponent
                             id={module.id}
                             {...module.props}
+                            value={rowData.value}
                             onChange={(newValue) => handleModuleChange(module.id, newValue)}
                         />
                     </div>

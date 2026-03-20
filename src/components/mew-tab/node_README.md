@@ -58,9 +58,9 @@ Types of nodes:
 - audio
 - servo
 
-# Process for updating new nodes or modules
+# Process for updating new nodes or row modules
 
-## New modules
+## New row modules
 
 1. **Add the component.**  
    * Create a new file in `src/components/mew-tab/row-modules/`, e.g.
@@ -84,13 +84,14 @@ Types of nodes:
 1. **Add a definition to the catalog.**  
    * Open `src/components/mew-tab/nodeCatalog.js` and add a new entry under
      `NODE_DEFINITIONS`.  
-   * A node is simply an array of `{ id?, type, props }` objects referencing
-     registered row modules.
+   * A node is an object with:
+     - `rows`: array of `{ id?, type, props, io? }`
+     - optional `defaults`: node-level default value rules (see below)
 
 2. **Test the rendering.**  
    * Drag the new node from the toolbox or drop it onto the workbench; verify
-     the correct modules appear and that any interactive rows behave as
-     expected.
+     the correct modules appear and that interactive rows are pre-populated
+     from resolved defaults.
 
 3. **(Optional) add logic.**  
    * If the node needs its own behaviour you can pass callbacks through the
@@ -99,10 +100,87 @@ Types of nodes:
 
 4. **Document.**  
    * Add the node name and a short description to this README.
-   * Mention any required modules or special configuration.
+   * Mention any required modules, IO config, and default rules.
 
 Because nodes are defined declaratively the toolbox/business‑logic code never
 needs to change; new node types “just work” once the catalog entry exists.
+
+## Node-level defaults (new)
+
+Defaults are configured at the **node definition level** (not hardcoded in row modules).
+When a node is created, defaults are resolved and written into that node instance’s `data`.
+
+### Supported rule types
+
+- `literal`: static value
+- `sequence`: auto-increment value with zero-padding and uniqueness checks
+- `template`: string template with sequence token support (e.g. `Agent {seq:3}`)
+
+### Suggested schema
+
+```js
+{
+  Agent: {
+    rows: [
+      { id: 'name', type: 'textInput', props: { label: 'Name', placeholder: 'Agent name' } },
+      { id: 'model', type: 'dropdown', props: { label: 'Model', options: [...] } }
+    ],
+    defaults: {
+      scope: 'nodeType', // 'nodeType' | 'global'
+      rules: [
+        { rowId: 'name', field: 'value', type: 'template', template: 'Agent {seq:3}' },
+        { rowId: 'model', field: 'value', type: 'literal', value: 'gpt3.5 turbo' }
+      ]
+    }
+  }
+}
+```
+
+### Behavior requirements
+
+- Defaults are resolved **on node creation**.
+- Resolved values are stored on the node instance (`node.data[rowId]`).
+- Sequence rules must avoid duplicates by checking existing graph node data.
+- Counters may be persisted in `graph.meta.namingCounters` for stable incrementing.
+- Row modules render from passed `value`; they do not generate naming logic.
+
+# Row modules and usage examples
+
+- title row  
+    – read‑only header  
+    – example usage in nodeCatalog:
+    ```js
+      { id: 'title', type: 'title', props: { text: 'My node' } }
+    ```
+
+- text‑input row  
+    – editable text box with optional label/placeholder, calls `onChange` when the value changes  
+    – example usage:
+    ```js
+      {
+        id: 'name',
+        type: 'textInput',
+        props: { label: 'Name', placeholder: 'Agent name' }
+      }
+    ```
+
+- dropdown row  
+    – select control; supply `options` array, optional `label`, and `defaultValue` for initial selection  
+    – example usage:
+    ```js
+      {
+        id: 'mode',
+        type: 'dropdown',
+        props: {
+          label: 'Mode',
+          options: [
+            { value: 'audio', label: 'Audio' },
+            { value: 'text',  label: 'Text' }
+          ],
+          defaultValue: 'audio'
+        }
+      }
+    ```
 
 # Row modules and usage examples
 

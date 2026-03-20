@@ -1,76 +1,143 @@
 /**
  * Node catalog - defines all available node types and their row module compositions.
- * Each node type is an array of row module definitions.
+ * New schema:
+ * {
+ *   [type]: {
+ *     rows: Array<RowDefinition>,
+ *     defaults?: { scope?: 'nodeType' | 'global', rules: Array<DefaultRule> }
+ *   }
+ * }
+ * Backward compatibility: array-only definitions are still accepted.
  */
 
 export const NODE_DEFINITIONS = {
-    Agent: [
-        { 
-            id: 'name', 
-            type: 'textInput', 
-            props: { label: 'Name', placeholder: 'Agent name' }, 
-            io: { 
-                input: { 
-                    portId: 'in_value' 
-                }, 
-                output: { 
-                    portId: 'out_value' 
-                } 
-            } 
-        },
-        {
-            id: 'model',
-            type: 'dropdown',
-            props: {
-                label: 'model',
-                options: [
-                    { value: 'gpt3.5 turbo', label: 'GPT3.5 Turbo' }
-                ],
-                defaultValue: 'gpt3.5 turbo'
+    Agent: {
+        rows: [
+            {
+                id: 'name',
+                type: 'textInput',
+                props: {label: 'Name', placeholder: 'Agent name'},
+                io: {
+                    input: {portId: 'in_value'},
+                    output: {portId: 'out_value'}
+                }
             },
-            io: {
+            {
+                id: 'model',
+                type: 'dropdown',
+                props: {
+                    label: 'model',
+                    options: [
+                        {value: 'gpt3.5 turbo', label: 'GPT3.5 Turbo'}
+                    ],
+                    defaultValue: 'gpt3.5 turbo'
+                },
+                io: {}
             }
-        },
-    ],
+        ],
+        defaults: {
+            scope: 'nodeType',
+            rules: [
+                {rowId: 'name', field: 'value', type: 'template', template: 'Agent {seq:3}'},
+                {rowId: 'model', field: 'value', type: 'literal', value: 'gpt3.5 turbo'}
+            ]
+        }
+    },
 
-    Notepad: [
-        { id: 'name', type: 'textInput', props: { label: 'Name', placeholder: 'Notepad name' } },
-    ],
+    Notepad: {
+        rows: [
+            {id: 'name', type: 'textInput', props: {label: 'Name', placeholder: 'Notepad name'}}
+        ],
+        defaults: {
+            scope: 'nodeType',
+            rules: [
+                {rowId: 'name', field: 'value', type: 'template', template: 'Notepad {seq:3}'}
+            ]
+        }
+    },
 
-    Variable: [
-        { id: 'title', type: 'title', props: { text: 'Variable' } },
-    ],
+    Variable: {
+        rows: [
+            {id: 'title', type: 'title', props: {text: 'Variable'}}
+        ]
+    },
 
-    Receiver: [
-        { id: 'title', type: 'title', props: { text: 'Receiver' } },
-    ],
+    Receiver: {
+        rows: [
+            {id: 'title', type: 'title', props: {text: 'Receiver'}}
+        ]
+    },
 
-    Broadcaster: [
-        { id: 'title', type: 'title', props: { text: 'Broadcaster' } },
-    ],
+    Broadcaster: {
+        rows: [
+            {id: 'title', type: 'title', props: {text: 'Broadcaster'}}
+        ]
+    },
 
-    Comment: [
-        { id: 'title', type: 'title', props: { text: 'Comment' } },
-    ],
+    Comment: {
+        rows: [
+            {id: 'title', type: 'title', props: {text: 'Comment'}}
+        ]
+    },
 
-    Microphone: [
-        { id: 'name', type: 'textInput', props: { label: 'Name', placeholder: 'Microphone name' } },
-    ],
+    Microphone: {
+        rows: [
+            {id: 'name', type: 'textInput', props: {label: 'Name', placeholder: 'Microphone name'}}
+        ],
+        defaults: {
+            scope: 'nodeType',
+            rules: [
+                {rowId: 'name', field: 'value', type: 'template', template: 'Microphone {seq:3}'}
+            ]
+        }
+    },
 
-    Audio: [
-        { id: 'name', type: 'textInput', props: { label: 'Name', placeholder: 'Audio name' } },
-    ],
+    Audio: {
+        rows: [
+            {id: 'name', type: 'textInput', props: {label: 'Name', placeholder: 'Audio name'}}
+        ],
+        defaults: {
+            scope: 'nodeType',
+            rules: [
+                {rowId: 'name', field: 'value', type: 'template', template: 'Audio {seq:3}'}
+            ]
+        }
+    },
 
-    Servo: [
-        { id: 'title', type: 'title', props: { text: 'Servo' } },
-    ],
+    Servo: {
+        rows: [
+            {id: 'title', type: 'title', props: {text: 'Servo'}}
+        ]
+    }
+};
+
+const normalizeDefinition = definition => {
+    if (Array.isArray(definition)) {
+        return {rows: definition, defaults: null};
+    }
+    return {
+        rows: definition?.rows || [],
+        defaults: definition?.defaults || null
+    };
 };
 
 /**
- * Get a node definition by type.
- * @param {string} nodeType - The node type (e.g. 'Agent', 'Variable')
- * @returns {Array<Object>} The module array for that node type
+ * Get normalized node definition by type.
+ * @param {string} nodeType
+ * @returns {{rows: Array<Object>, defaults: Object|null}}
  */
-export const getNodeDefinition = (nodeType) => {
-    return NODE_DEFINITIONS[nodeType];
-};
+export const getNodeDefinition = nodeType => normalizeDefinition(NODE_DEFINITIONS[nodeType]);
+
+/**
+ * Convenience: get row definitions only.
+ * @param {string} nodeType
+ * @returns {Array<Object>}
+ */
+export const getNodeRows = nodeType => getNodeDefinition(nodeType).rows;
+
+/**
+ * Convenience: get defaults config only.
+ * @param {string} nodeType
+ * @returns {Object|null}
+ */
+export const getNodeDefaults = nodeType => getNodeDefinition(nodeType).defaults;
