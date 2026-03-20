@@ -180,7 +180,7 @@ $border-radius: 0.25rem;
     z-index: 9;
     pointer-events: none;
     border: 1px dashed #ffffffa4;
-    border-radius: 10px;
+    border-radius: 15px;
     background: rgba(76, 151, 255, 0.05);
 }
 

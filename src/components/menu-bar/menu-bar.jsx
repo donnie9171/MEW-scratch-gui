@@ -74,6 +74,10 @@ import {
 
 import {resetMewGraph} from '../../reducers/mew-graph';
 
+import {undoMewGraph, getCanUndoMewGraph} from '../../reducers/mew-graph';
+
+import {getActiveTabIndex, MEW_TAB_INDEX} from '../../reducers/editor-tab';
+
 import collectMetadata from '../../lib/collect-metadata';
 
 import styles from './menu-bar.css';
@@ -386,6 +390,9 @@ class MenuBar extends React.Component {
         };
     }
     render () {
+
+        const canUndoMewNow = this.props.canUndoMewGraph && this.props.isMewTabActive;
+
         const saveNowMessage = (
             <FormattedMessage
                 defaultMessage="Save now"
@@ -732,6 +739,18 @@ class MenuBar extends React.Component {
                             </span>
                         </div>
                     </div> */}
+                    <div
+                        className={classNames(styles.menuBarItem, styles.hoverable, {
+                            [styles.disabled]: !canUndoMewNow
+                        })}
+                        onMouseUp={canUndoMewNow ? this.props.onUndoMewGraph : null}
+                    >
+                        <FormattedMessage
+                            defaultMessage="Undo (for MEW only)"
+                            description="Undo latest MEW graph action"
+                            id="gui.menuBar.undo"
+                        />
+                    </div>
                 </div>
 
                 {/* show the proper UI in the account menu, given whether the user is
@@ -886,6 +905,9 @@ MenuBar.propTypes = {
     canRemix: PropTypes.bool,
     canSave: PropTypes.bool,
     canShare: PropTypes.bool,
+    isMewTabActive: PropTypes.bool,
+    canUndoMewGraph: PropTypes.bool,
+    onUndoMewGraph: PropTypes.func,
     className: PropTypes.string,
     confirmReadyToReplaceProject: PropTypes.func,
     currentLocale: PropTypes.string.isRequired,
@@ -988,7 +1010,9 @@ const mapStateToProps = (state, ownProps) => {
         mode1920: isTimeTravel1920(state),
         mode1990: isTimeTravel1990(state),
         mode2020: isTimeTravel2020(state),
-        modeNow: isTimeTravelNow(state)
+        modeNow: isTimeTravelNow(state),
+        canUndoMewGraph: getCanUndoMewGraph(state),
+        isMewTabActive: getActiveTabIndex(state) === MEW_TAB_INDEX
     };
 };
 
@@ -1016,7 +1040,8 @@ const mapDispatchToProps = dispatch => ({
     onClickSave: () => dispatch(manualUpdateProject()),
     onClickSaveAsCopy: () => dispatch(saveProjectAsCopy()),
     onSeeCommunity: () => dispatch(setPlayer(true)),
-    onSetTimeTravelMode: mode => dispatch(setTimeTravel(mode))
+    onSetTimeTravelMode: mode => dispatch(setTimeTravel(mode)),
+    onUndoMewGraph: () => dispatch(undoMewGraph())
 });
 
 export default compose(

@@ -6,6 +6,8 @@ import { resolveNodeDefaults } from './workbench/defaultValueRules';
 import styles from './mew-tab.css';
 import { connect } from 'react-redux';
 import {setMewGraph, getMewGraph, undoMewGraph, checkpointMewGraph} from '../../reducers/mew-graph';
+import {getActiveTabIndex, MEW_TAB_INDEX} from '../../reducers/editor-tab';
+
 import {
     createEmptyGraph,
     deriveEdges,
@@ -43,7 +45,8 @@ const WorkbenchPanel = ({
     setMewGraph: dispatchSetMewGraph,
     undoMewGraph: dispatchUndoMewGraph,
     checkpointMewGraph: dispatchCheckpointMewGraph,
-    mewGraph
+    mewGraph,
+    isMewTabActive
  }) => {
     const [graph, setGraph] = useState(() => mewGraph || loadLocalGraph() || createEmptyGraph());
     const lastAppliedReduxUpdatedAt = useRef(null);
@@ -128,17 +131,6 @@ const WorkbenchPanel = ({
         dispatchSetMewGraph(graph, {checkpoint});
         suppressNextCheckpointRef.current = false;
     }, [dispatchSetMewGraph, graph]);
-
-    const isTypingTarget = target => {
-        if (!target) return false;
-        const tag = target.tagName?.toLowerCase();
-        return (
-            target.isContentEditable ||
-            tag === 'input' ||
-            tag === 'textarea' ||
-            tag === 'select'
-        );
-    };
 
     const idCounterRef = useRef(0);
 
@@ -440,11 +432,6 @@ const WorkbenchPanel = ({
         setGraph(mewGraph);
     }, [mewGraph]);
 
-    // Keep Redux in sync with local edits
-    useEffect(() => {
-        dispatchSetMewGraph(graph);
-    }, [dispatchSetMewGraph, graph]);
-
     // Keep localStorage as fallback cache
     useEffect(() => {
         try {
@@ -456,6 +443,8 @@ const WorkbenchPanel = ({
 
     useEffect(() => {
         const onKeyDown = event => {
+            if (!isMewTabActive) return; // gate all MEW shortcuts to MEW tab only
+
             const target = event.target;
             const tag = target?.tagName?.toLowerCase();
             const isTyping =
@@ -463,13 +452,11 @@ const WorkbenchPanel = ({
                 tag === 'input' ||
                 tag === 'textarea' ||
                 tag === 'select';
-
             if (isTyping) return;
 
             const key = (event.key || '').toLowerCase();
             const hasMod = event.metaKey || event.ctrlKey;
 
-            // Cmd/Ctrl + Z -> undo
             if (hasMod && key === 'z' && !event.shiftKey) {
                 event.preventDefault();
                 dispatchUndoMewGraph();
@@ -506,7 +493,7 @@ const WorkbenchPanel = ({
 
         window.addEventListener('keydown', onKeyDown);
         return () => window.removeEventListener('keydown', onKeyDown);
-    }, [selectedNodeIds, graph.nodes, handleDeleteSelected, handleDuplicateSelected, dispatchUndoMewGraph]);
+    }, [selectedNodeIds, graph.nodes, handleDeleteSelected, handleDuplicateSelected, dispatchUndoMewGraph, isMewTabActive]);
 
     useLayoutEffect(() => {
         const wb = workbenchRef.current;
@@ -1066,7 +1053,8 @@ const WorkbenchPanel = ({
 };
 
 const mapStateToProps = state => ({
-    mewGraph: getMewGraph(state)
+    mewGraph: getMewGraph(state),
+    isMewTabActive: getActiveTabIndex(state) === MEW_TAB_INDEX
 });
 
 const mapDispatchToProps = {

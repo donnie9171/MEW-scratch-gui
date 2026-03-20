@@ -4,6 +4,7 @@ const ACTIVATE_TAB = 'scratch-gui/navigation/ACTIVATE_TAB';
 const BLOCKS_TAB_INDEX = 0;
 const COSTUMES_TAB_INDEX = 1;
 const SOUNDS_TAB_INDEX = 2;
+const MEW_TAB_INDEX = 3;
 
 const initialState = {
     activeTabIndex: BLOCKS_TAB_INDEX
@@ -28,11 +29,15 @@ const activateTab = function (tab) {
     };
 };
 
+const getActiveTabIndex = state => state.scratchGui.editorTab.activeTabIndex;
+
 export {
     reducer as default,
     initialState as editorTabInitialState,
     activateTab,
+    getActiveTabIndex,
     BLOCKS_TAB_INDEX,
     COSTUMES_TAB_INDEX,
-    SOUNDS_TAB_INDEX
+    SOUNDS_TAB_INDEX,
+    MEW_TAB_INDEX
 };
