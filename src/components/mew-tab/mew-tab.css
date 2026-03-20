@@ -175,6 +175,40 @@ $border-radius: 0.25rem;
     border-radius: 10px;
 }
 
+.selectionGroupBounds {
+    position: absolute;
+    z-index: 9;
+    pointer-events: none;
+    border: 1px dashed #ffffffa4;
+    border-radius: 10px;
+    background: rgba(76, 151, 255, 0.05);
+}
+
+.selectionActions {
+    position: absolute;
+    z-index: 20;
+    display: flex;
+    gap: 6px;
+    padding: 6px;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.96);
+    border: 1px solid #d9e1ef;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.14);
+}
+
+.selectionActionButton {
+    border: 1px solid #c8d3e6;
+    background: #ffffff;
+    border-radius: 6px;
+    padding: 4px 8px;
+    font-size: 12px;
+    cursor: pointer;
+}
+
+.selectionActionButton:hover {
+    background: #f2f6ff;
+}
+
 @keyframes nodeDeleteShrink {
     from {
         transform: scale(1);

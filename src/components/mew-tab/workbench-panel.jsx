@@ -115,6 +115,102 @@ const WorkbenchPanel = ({ setMewGraph: dispatchSetMewGraph, mewGraph }) => {
         a.bottom > b.top
     );
 
+    const idCounterRef = useRef(0);
+
+    const makeNodeId = type => {
+        idCounterRef.current += 1;
+        return `${type}-${Date.now()}-${idCounterRef.current}`;
+    };
+
+    const selectedBounds = useMemo(() => {
+        if (!selectedNodeIds.length) return null;
+
+        const rects = selectedNodeIds
+            .map(id => getWorkbenchNodeRect(id))
+            .filter(Boolean);
+
+        if (!rects.length) return null;
+
+        return rects.reduce((acc, r) => ({
+            left: Math.min(acc.left, r.left),
+            top: Math.min(acc.top, r.top),
+            right: Math.max(acc.right, r.right),
+            bottom: Math.max(acc.bottom, r.bottom)
+        }));
+    }, [selectedNodeIds, graph.nodes, layoutVersion]);
+
+    const handleDeleteSelected = () => {
+        if (!selectedNodeIds.length) return;
+        removeNodesAndEdges(selectedNodeIds);
+        setSelectedNodeIds([]);
+    };
+
+    const handleDuplicateSelected = () => {
+        if (!selectedNodeIds.length) return;
+
+        const selectedSet = new Set(selectedNodeIds);
+        const sourceNodes = graph.nodes.filter(n => selectedSet.has(n.id));
+        if (!sourceNodes.length) return;
+
+        const idMap = {};
+        sourceNodes.forEach(n => {
+            idMap[n.id] = makeNodeId(n.type);
+        });
+
+        const pairs = sourceNodes.map(orig => ({
+            orig,
+            clone: {
+                ...orig,
+                id: idMap[orig.id],
+                x: orig.x + 24,
+                y: orig.y + 24,
+                data: JSON.parse(JSON.stringify(orig.data || {})),
+                inputs: {},
+                outputs: {}
+            }
+        }));
+
+        // Keep only internal edges among selected nodes, remapped to cloned ids.
+        pairs.forEach(pair => {
+            const nextOutputs = {};
+            for (const [outPortId, targets] of Object.entries(pair.orig.outputs || {})) {
+                const remapped = (targets || [])
+                    .filter(t => selectedSet.has(t.nodeId))
+                    .map(t => ({
+                        nodeId: idMap[t.nodeId],
+                        portId: t.portId
+                    }));
+                if (remapped.length) nextOutputs[outPortId] = remapped;
+            }
+            pair.clone.outputs = nextOutputs;
+        });
+
+        // Rebuild cloned inputs from cloned outputs.
+        const clonedById = Object.fromEntries(pairs.map(p => [p.clone.id, p.clone]));
+        pairs.forEach(({clone}) => {
+            for (const [outPortId, targets] of Object.entries(clone.outputs || {})) {
+                (targets || []).forEach(t => {
+                    const targetNode = clonedById[t.nodeId];
+                    if (!targetNode) return;
+                    const list = [...(targetNode.inputs[t.portId] || [])];
+                    list.push({nodeId: clone.id, portId: outPortId});
+                    targetNode.inputs[t.portId] = list;
+                });
+            }
+        });
+
+        const clonedNodes = pairs.map(p => p.clone);
+        setGraph(prev => ({
+            ...prev,
+            nodes: [...prev.nodes, ...clonedNodes],
+            meta: {...prev.meta, updatedAt: new Date().toISOString()}
+        }));
+
+        setSelectedNodeIds(clonedNodes.map(n => n.id));
+    };
+
+    
+
     // Hydrate from imported project graph when Redux updates
     useEffect(() => {
         if (!mewGraph) return;
@@ -757,6 +853,45 @@ const WorkbenchPanel = ({ setMewGraph: dispatchSetMewGraph, mewGraph }) => {
                     />
                 );
             })()}
+
+            {!selectionBox && selectedBounds && selectedNodeIds.length > 1 && (
+                <div
+                    className={styles.selectionGroupBounds}
+                    style={{
+                        left: selectedBounds.left - 6,
+                        top: selectedBounds.top - 6,
+                        width: (selectedBounds.right - selectedBounds.left) + 12,
+                        height: (selectedBounds.bottom - selectedBounds.top) + 12
+                    }}
+                />
+            )}
+
+            {selectedBounds && selectedNodeIds.length > 0 && (
+                <div
+                    className={styles.selectionActions}
+                    style={{
+                        left: (selectedBounds.left + selectedBounds.right) / 2,
+                        top: selectedBounds.bottom + 10,
+                        transform: 'translateX(-50%)'
+                    }}
+                    onPointerDown={e => e.stopPropagation()}
+                >
+                    <button
+                        type="button"
+                        className={styles.selectionActionButton}
+                        onClick={handleDuplicateSelected}
+                    >
+                        Duplicate
+                    </button>
+                    <button
+                        type="button"
+                        className={styles.selectionActionButton}
+                        onClick={handleDeleteSelected}
+                    >
+                        Delete
+                    </button>
+                </div>
+            )}
 
             {/* preview only exists while over toolbox (or delete animation) */}
             {dragPreview && ReactDOM.createPortal(
