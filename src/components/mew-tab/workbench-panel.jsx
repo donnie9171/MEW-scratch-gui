@@ -273,6 +273,47 @@ const WorkbenchPanel = ({ setMewGraph: dispatchSetMewGraph, mewGraph }) => {
         });
     };
 
+    const removeNodesAndEdges = nodeIds => {
+        const removeSet = new Set(nodeIds);
+        setGraph(prev => {
+            const nextNodes = prev.nodes
+                .filter(n => !removeSet.has(n.id))
+                .map(n => {
+                    const nextOutputs = {};
+                    for (const [portId, targets] of Object.entries(n.outputs || {})) {
+                        const kept = (targets || []).filter(t => !removeSet.has(t.nodeId));
+                        if (kept.length) nextOutputs[portId] = kept;
+                    }
+
+                    const nextInputs = {};
+                    for (const [portId, sources] of Object.entries(n.inputs || {})) {
+                        const kept = (sources || []).filter(s => !removeSet.has(s.nodeId));
+                        if (kept.length) nextInputs[portId] = kept;
+                    }
+
+                    return {...n, outputs: nextOutputs, inputs: nextInputs};
+                });
+
+            return {
+                ...prev,
+                nodes: nextNodes,
+                meta: {...prev.meta, updatedAt: new Date().toISOString()}
+            };
+        });
+    };
+
+    const moveDraggedNodesByDelta = (draggedNodeIds, startPositions, dx, dy) => {
+        const dragSet = new Set(draggedNodeIds);
+        setGraph(prev => ({
+            ...prev,
+            nodes: prev.nodes.map(n => {
+                if (!dragSet.has(n.id)) return n;
+                const start = startPositions[n.id];
+                return start ? {...n, x: start.x + dx, y: start.y + dy} : n;
+            })
+        }));
+    };
+
     const computeMarqueeHitIds = box => {
         const rect = normalizeRect(box);
         if (!rect) return [];
@@ -446,12 +487,15 @@ const WorkbenchPanel = ({ setMewGraph: dispatchSetMewGraph, mewGraph }) => {
         const interactive = event.target.closest('input, textarea, select, button, [contenteditable="true"]');
         if (interactive) return;
 
-        // Phase 1 selection behavior
+        // shift+click = selection toggle only (no drag start)
         if (event.shiftKey) {
             toggleNodeSelection(node.id);
-        } else {
-            selectOnlyNode(node.id);
+            return;
         }
+
+        // If clicked node is already selected, drag whole selection. Otherwise drag only clicked node.
+        const draggedNodeIds = isNodeSelected(node.id) ? selectedNodeIds : [node.id];
+        if (!isNodeSelected(node.id)) selectOnlyNode(node.id);
 
         event.preventDefault();
         setDraggingNodeId(node.id);
@@ -460,34 +504,40 @@ const WorkbenchPanel = ({ setMewGraph: dispatchSetMewGraph, mewGraph }) => {
         const offsetX = event.clientX - rect.left;
         const offsetY = event.clientY - rect.top;
 
-        // do NOT start preview immediately
+        const startPositions = {};
+        for (const n of graph.nodes) {
+            if (draggedNodeIds.includes(n.id)) {
+                startPositions[n.id] = {x: n.x, y: n.y};
+            }
+        }
+
         setDragPreview(null);
         dragOverToolboxRef.current = false;
         setDragOverToolbox(false);
 
         dragRef.current = {
-            nodeId: node.id,
+            nodeId: node.id, // anchor node (for delete preview)
             nodeType: node.type,
+            draggedNodeIds,
+            startPositions,
             startClientX: event.clientX,
             startClientY: event.clientY,
-            startNodeX: node.x,
-            startNodeY: node.y,
             offsetX,
             offsetY,
             width: rect.width,
             height: rect.height
         };
 
-        const onPointerMove = (moveEvent) => {
+        const onPointerMove = moveEvent => {
             const active = dragRef.current;
             if (!active) return;
 
             const dx = moveEvent.clientX - active.startClientX;
             const dy = moveEvent.clientY - active.startClientY;
 
-            moveNodeToPosition(active.nodeId, active.startNodeX + dx, active.startNodeY + dy);
+            moveDraggedNodesByDelta(active.draggedNodeIds, active.startPositions, dx, dy);
 
-            // Compute dragged node bbox in viewport coordinates
+            // anchor-node bbox for toolbox overlap check
             const nodeRect = {
                 left: moveEvent.clientX - active.offsetX,
                 top: moveEvent.clientY - active.offsetY,
@@ -502,13 +552,9 @@ const WorkbenchPanel = ({ setMewGraph: dispatchSetMewGraph, mewGraph }) => {
             if (isOverToolbox !== dragOverToolboxRef.current) {
                 dragOverToolboxRef.current = isOverToolbox;
                 setDragOverToolbox(isOverToolbox);
-
-                if (!isOverToolbox) {
-                    setDragPreview(null); // immediately disable portal preview
-                }
+                if (!isOverToolbox) setDragPreview(null);
             }
 
-            // Only render/update portal preview while overlapping toolbox
             if (isOverToolbox) {
                 setDragPreview(prev => ({
                     nodeId: active.nodeId,
@@ -522,10 +568,9 @@ const WorkbenchPanel = ({ setMewGraph: dispatchSetMewGraph, mewGraph }) => {
             }
         };
 
-        const onPointerUp = (upEvent) => {
+        const onPointerUp = upEvent => {
             const active = dragRef.current;
 
-            // Final overlap check uses node bbox (not cursor)
             const nodeRect = active ? {
                 left: upEvent.clientX - active.offsetX,
                 top: upEvent.clientY - active.offsetY,
@@ -535,9 +580,7 @@ const WorkbenchPanel = ({ setMewGraph: dispatchSetMewGraph, mewGraph }) => {
 
             const toolboxEl = document.querySelector('[data-mew-toolbox-dropzone="true"]');
             const toolboxRect = toolboxEl ? toolboxEl.getBoundingClientRect() : null;
-            const droppedInToolbox = nodeRect && toolboxRect
-                ? isRectOverlapping(nodeRect, toolboxRect)
-                : false;
+            const droppedInToolbox = nodeRect && toolboxRect ? isRectOverlapping(nodeRect, toolboxRect) : false;
 
             dragRef.current = null;
             setDraggingNodeId(null);
@@ -545,8 +588,9 @@ const WorkbenchPanel = ({ setMewGraph: dispatchSetMewGraph, mewGraph }) => {
             setDragOverToolbox(false);
 
             if (droppedInToolbox) {
-                setDeletingNodeId(node.id);
+                const idsToDelete = active?.draggedNodeIds || [node.id];
 
+                setDeletingNodeId(node.id);
                 setDragPreview(prev => prev || {
                     nodeId: active?.nodeId || node.id,
                     nodeType: active?.nodeType || node.type,
@@ -556,11 +600,11 @@ const WorkbenchPanel = ({ setMewGraph: dispatchSetMewGraph, mewGraph }) => {
                     offsetY: active?.offsetY || 0,
                     deleting: false
                 });
-
-                setDragPreview(prev => (prev ? ({ ...prev, deleting: true }) : prev));
+                setDragPreview(prev => (prev ? ({...prev, deleting: true}) : prev));
 
                 window.setTimeout(() => {
-                    removeNodeAndEdges(node.id);
+                    removeNodesAndEdges(idsToDelete);
+                    setSelectedNodeIds(prev => prev.filter(id => !idsToDelete.includes(id)));
                     setDeletingNodeId(null);
                     setDragPreview(null);
                 }, 170);
@@ -568,7 +612,7 @@ const WorkbenchPanel = ({ setMewGraph: dispatchSetMewGraph, mewGraph }) => {
                 setDragPreview(null);
                 setGraph(prev => ({
                     ...prev,
-                    meta: { ...prev.meta, updatedAt: new Date().toISOString() }
+                    meta: {...prev.meta, updatedAt: new Date().toISOString()}
                 }));
             }
 
