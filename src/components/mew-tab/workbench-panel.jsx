@@ -5,7 +5,7 @@ import { getNodeDefinition } from './nodeCatalog';
 import { resolveNodeDefaults } from './workbench/defaultValueRules';
 import styles from './mew-tab.css';
 import { connect } from 'react-redux';
-import {setMewGraph, getMewGraph} from '../../reducers/mew-graph';
+import {setMewGraph, getMewGraph, undoMewGraph, checkpointMewGraph} from '../../reducers/mew-graph';
 import {
     createEmptyGraph,
     deriveEdges,
@@ -39,7 +39,12 @@ const loadLocalGraph = () => {
     }
 };
 
-const WorkbenchPanel = ({ setMewGraph: dispatchSetMewGraph, mewGraph }) => {
+const WorkbenchPanel = ({ 
+    setMewGraph: dispatchSetMewGraph,
+    undoMewGraph: dispatchUndoMewGraph,
+    checkpointMewGraph: dispatchCheckpointMewGraph,
+    mewGraph
+ }) => {
     const [graph, setGraph] = useState(() => mewGraph || loadLocalGraph() || createEmptyGraph());
     const lastAppliedReduxUpdatedAt = useRef(null);
     const [draggingNodeId, setDraggingNodeId] = useState(null);
@@ -63,6 +68,9 @@ const WorkbenchPanel = ({ setMewGraph: dispatchSetMewGraph, mewGraph }) => {
     const marqueeRef = useRef(null);
 
     const isNodeSelected = nodeId => selectedNodeIds.includes(nodeId);
+
+    const suppressNextCheckpointRef = useRef(false);
+
 
     const selectOnlyNode = nodeId => {
         setSelectedNodeIds([nodeId]);
@@ -114,6 +122,12 @@ const WorkbenchPanel = ({ setMewGraph: dispatchSetMewGraph, mewGraph }) => {
         a.top < b.bottom &&
         a.bottom > b.top
     );
+
+    useEffect(() => {
+        const checkpoint = !suppressNextCheckpointRef.current;
+        dispatchSetMewGraph(graph, {checkpoint});
+        suppressNextCheckpointRef.current = false;
+    }, [dispatchSetMewGraph, graph]);
 
     const isTypingTarget = target => {
         if (!target) return false;
@@ -263,6 +277,9 @@ const WorkbenchPanel = ({ setMewGraph: dispatchSetMewGraph, mewGraph }) => {
 
 
     const beginDragForNodes = (event, anchorNode, draggedNodeIds) => {
+        // checkpoint BEFORE position mutations so one undo restores original positions
+        dispatchCheckpointMewGraph();
+
         event.preventDefault();
         event.stopPropagation();
 
@@ -374,6 +391,9 @@ const WorkbenchPanel = ({ setMewGraph: dispatchSetMewGraph, mewGraph }) => {
                 setDragPreview(prev => (prev ? ({...prev, deleting: true}) : prev));
 
                 window.setTimeout(() => {
+                    // Treat drag->delete as part of same undo unit as the drag.
+                    suppressNextCheckpointRef.current = true;
+
                     removeNodesAndEdges(idsToDelete);
                     setSelectedNodeIds(prev => prev.filter(id => !idsToDelete.includes(id)));
                     setDeletingNodeId(null);
@@ -436,10 +456,25 @@ const WorkbenchPanel = ({ setMewGraph: dispatchSetMewGraph, mewGraph }) => {
 
     useEffect(() => {
         const onKeyDown = event => {
-            if (isTypingTarget(event.target)) return;
+            const target = event.target;
+            const tag = target?.tagName?.toLowerCase();
+            const isTyping =
+                target?.isContentEditable ||
+                tag === 'input' ||
+                tag === 'textarea' ||
+                tag === 'select';
+
+            if (isTyping) return;
 
             const key = (event.key || '').toLowerCase();
             const hasMod = event.metaKey || event.ctrlKey;
+
+            // Cmd/Ctrl + Z -> undo
+            if (hasMod && key === 'z' && !event.shiftKey) {
+                event.preventDefault();
+                dispatchUndoMewGraph();
+                return;
+            }
 
             // Delete / Backspace -> delete selected
             if ((event.key === 'Delete' || event.key === 'Backspace') && selectedNodeIds.length > 0) {
@@ -471,7 +506,7 @@ const WorkbenchPanel = ({ setMewGraph: dispatchSetMewGraph, mewGraph }) => {
 
         window.addEventListener('keydown', onKeyDown);
         return () => window.removeEventListener('keydown', onKeyDown);
-    }, [selectedNodeIds, graph.nodes, handleDeleteSelected, handleDuplicateSelected]);
+    }, [selectedNodeIds, graph.nodes, handleDeleteSelected, handleDuplicateSelected, dispatchUndoMewGraph]);
 
     useLayoutEffect(() => {
         const wb = workbenchRef.current;
@@ -1035,7 +1070,9 @@ const mapStateToProps = state => ({
 });
 
 const mapDispatchToProps = {
-    setMewGraph
+    setMewGraph,
+    undoMewGraph,
+    checkpointMewGraph
 };
 
 export default connect(mapStateToProps, mapDispatchToProps)(WorkbenchPanel);
