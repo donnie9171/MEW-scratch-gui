@@ -184,6 +184,15 @@ $border-radius: 0.25rem;
     background: rgba(76, 151, 255, 0.05);
 }
 
+.selectionGroupBoundsHandle {
+    pointer-events: auto;
+    cursor: grab;
+}
+
+.selectionGroupBoundsDragging {
+    cursor: grabbing;
+}
+
 .selectionActions {
     position: absolute;
     z-index: 20;

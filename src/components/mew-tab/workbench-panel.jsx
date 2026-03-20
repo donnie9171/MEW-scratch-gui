@@ -209,7 +209,150 @@ const WorkbenchPanel = ({ setMewGraph: dispatchSetMewGraph, mewGraph }) => {
         setSelectedNodeIds(clonedNodes.map(n => n.id));
     };
 
-    
+
+    const beginDragForNodes = (event, anchorNode, draggedNodeIds) => {
+        event.preventDefault();
+        event.stopPropagation();
+
+        setDraggingNodeId(anchorNode.id);
+
+        const anchorEl = workbenchRef.current?.querySelector(
+            `[data-workbench-node-id="${anchorNode.id}"]`
+        );
+        const rect = (anchorEl || event.currentTarget).getBoundingClientRect();
+
+        const offsetX = event.clientX - rect.left;
+        const offsetY = event.clientY - rect.top;
+
+        const startPositions = {};
+        for (const n of graph.nodes) {
+            if (draggedNodeIds.includes(n.id)) {
+                startPositions[n.id] = {x: n.x, y: n.y};
+            }
+        }
+
+        setDragPreview(null);
+        dragOverToolboxRef.current = false;
+        setDragOverToolbox(false);
+
+        dragRef.current = {
+            nodeId: anchorNode.id,
+            nodeType: anchorNode.type,
+            draggedNodeIds,
+            startPositions,
+            startClientX: event.clientX,
+            startClientY: event.clientY,
+            offsetX,
+            offsetY,
+            width: rect.width,
+            height: rect.height
+        };
+
+        const onPointerMove = moveEvent => {
+            const active = dragRef.current;
+            if (!active) return;
+
+            const dx = moveEvent.clientX - active.startClientX;
+            const dy = moveEvent.clientY - active.startClientY;
+
+            moveDraggedNodesByDelta(active.draggedNodeIds, active.startPositions, dx, dy);
+
+            const nodeRect = {
+                left: moveEvent.clientX - active.offsetX,
+                top: moveEvent.clientY - active.offsetY,
+                right: moveEvent.clientX - active.offsetX + active.width,
+                bottom: moveEvent.clientY - active.offsetY + active.height
+            };
+
+            const toolboxEl = document.querySelector('[data-mew-toolbox-dropzone="true"]');
+            const toolboxRect = toolboxEl ? toolboxEl.getBoundingClientRect() : null;
+            const isOverToolbox = toolboxRect ? isRectOverlapping(nodeRect, toolboxRect) : false;
+
+            if (isOverToolbox !== dragOverToolboxRef.current) {
+                dragOverToolboxRef.current = isOverToolbox;
+                setDragOverToolbox(isOverToolbox);
+                if (!isOverToolbox) setDragPreview(null);
+            }
+
+            if (isOverToolbox) {
+                setDragPreview(prev => ({
+                    nodeId: active.nodeId,
+                    nodeType: active.nodeType,
+                    x: nodeRect.left,
+                    y: nodeRect.top,
+                    offsetX: active.offsetX,
+                    offsetY: active.offsetY,
+                    deleting: prev?.deleting || false
+                }));
+            }
+        };
+
+        const onPointerUp = upEvent => {
+            const active = dragRef.current;
+
+            const nodeRect = active ? {
+                left: upEvent.clientX - active.offsetX,
+                top: upEvent.clientY - active.offsetY,
+                right: upEvent.clientX - active.offsetX + active.width,
+                bottom: upEvent.clientY - active.offsetY + active.height
+            } : null;
+
+            const toolboxEl = document.querySelector('[data-mew-toolbox-dropzone="true"]');
+            const toolboxRect = toolboxEl ? toolboxEl.getBoundingClientRect() : null;
+            const droppedInToolbox = nodeRect && toolboxRect ? isRectOverlapping(nodeRect, toolboxRect) : false;
+
+            dragRef.current = null;
+            setDraggingNodeId(null);
+            dragOverToolboxRef.current = false;
+            setDragOverToolbox(false);
+
+            if (droppedInToolbox) {
+                const idsToDelete = active?.draggedNodeIds || [anchorNode.id];
+                setDeletingNodeId(anchorNode.id);
+
+                setDragPreview(prev => prev || {
+                    nodeId: active?.nodeId || anchorNode.id,
+                    nodeType: active?.nodeType || anchorNode.type,
+                    x: nodeRect.left,
+                    y: nodeRect.top,
+                    offsetX: active?.offsetX || 0,
+                    offsetY: active?.offsetY || 0,
+                    deleting: false
+                });
+                setDragPreview(prev => (prev ? ({...prev, deleting: true}) : prev));
+
+                window.setTimeout(() => {
+                    removeNodesAndEdges(idsToDelete);
+                    setSelectedNodeIds(prev => prev.filter(id => !idsToDelete.includes(id)));
+                    setDeletingNodeId(null);
+                    setDragPreview(null);
+                }, 170);
+            } else {
+                setDragPreview(null);
+                setGraph(prev => ({
+                    ...prev,
+                    meta: {...prev.meta, updatedAt: new Date().toISOString()}
+                }));
+            }
+
+            window.removeEventListener('pointermove', onPointerMove);
+            window.removeEventListener('pointerup', onPointerUp);
+        };
+
+        window.addEventListener('pointermove', onPointerMove);
+        window.addEventListener('pointerup', onPointerUp);
+    };
+
+    const handleSelectionBoundsPointerDown = event => {
+        if (event.button !== 0) return;
+        if (selectedNodeIds.length < 2) return;
+
+        const anchorNode = graph.nodes.find(n => n.id === selectedNodeIds[0]);
+        if (!anchorNode) return;
+
+        beginDragForNodes(event, anchorNode, selectedNodeIds);
+    };
+
 
     // Hydrate from imported project graph when Redux updates
     useEffect(() => {
@@ -583,142 +726,19 @@ const WorkbenchPanel = ({ setMewGraph: dispatchSetMewGraph, mewGraph }) => {
         const interactive = event.target.closest('input, textarea, select, button, [contenteditable="true"]');
         if (interactive) return;
 
-        // shift+click = selection toggle only (no drag start)
         if (event.shiftKey) {
             toggleNodeSelection(node.id);
             return;
         }
 
-        // If clicked node is already selected, drag whole selection. Otherwise drag only clicked node.
         const draggedNodeIds = isNodeSelected(node.id) ? selectedNodeIds : [node.id];
         if (!isNodeSelected(node.id)) selectOnlyNode(node.id);
 
-        event.preventDefault();
-        setDraggingNodeId(node.id);
-
-        const rect = event.currentTarget.getBoundingClientRect();
-        const offsetX = event.clientX - rect.left;
-        const offsetY = event.clientY - rect.top;
-
-        const startPositions = {};
-        for (const n of graph.nodes) {
-            if (draggedNodeIds.includes(n.id)) {
-                startPositions[n.id] = {x: n.x, y: n.y};
-            }
-        }
-
-        setDragPreview(null);
-        dragOverToolboxRef.current = false;
-        setDragOverToolbox(false);
-
-        dragRef.current = {
-            nodeId: node.id, // anchor node (for delete preview)
-            nodeType: node.type,
-            draggedNodeIds,
-            startPositions,
-            startClientX: event.clientX,
-            startClientY: event.clientY,
-            offsetX,
-            offsetY,
-            width: rect.width,
-            height: rect.height
-        };
-
-        const onPointerMove = moveEvent => {
-            const active = dragRef.current;
-            if (!active) return;
-
-            const dx = moveEvent.clientX - active.startClientX;
-            const dy = moveEvent.clientY - active.startClientY;
-
-            moveDraggedNodesByDelta(active.draggedNodeIds, active.startPositions, dx, dy);
-
-            // anchor-node bbox for toolbox overlap check
-            const nodeRect = {
-                left: moveEvent.clientX - active.offsetX,
-                top: moveEvent.clientY - active.offsetY,
-                right: moveEvent.clientX - active.offsetX + active.width,
-                bottom: moveEvent.clientY - active.offsetY + active.height
-            };
-
-            const toolboxEl = document.querySelector('[data-mew-toolbox-dropzone="true"]');
-            const toolboxRect = toolboxEl ? toolboxEl.getBoundingClientRect() : null;
-            const isOverToolbox = toolboxRect ? isRectOverlapping(nodeRect, toolboxRect) : false;
-
-            if (isOverToolbox !== dragOverToolboxRef.current) {
-                dragOverToolboxRef.current = isOverToolbox;
-                setDragOverToolbox(isOverToolbox);
-                if (!isOverToolbox) setDragPreview(null);
-            }
-
-            if (isOverToolbox) {
-                setDragPreview(prev => ({
-                    nodeId: active.nodeId,
-                    nodeType: active.nodeType,
-                    x: nodeRect.left,
-                    y: nodeRect.top,
-                    offsetX: active.offsetX,
-                    offsetY: active.offsetY,
-                    deleting: prev?.deleting || false
-                }));
-            }
-        };
-
-        const onPointerUp = upEvent => {
-            const active = dragRef.current;
-
-            const nodeRect = active ? {
-                left: upEvent.clientX - active.offsetX,
-                top: upEvent.clientY - active.offsetY,
-                right: upEvent.clientX - active.offsetX + active.width,
-                bottom: upEvent.clientY - active.offsetY + active.height
-            } : null;
-
-            const toolboxEl = document.querySelector('[data-mew-toolbox-dropzone="true"]');
-            const toolboxRect = toolboxEl ? toolboxEl.getBoundingClientRect() : null;
-            const droppedInToolbox = nodeRect && toolboxRect ? isRectOverlapping(nodeRect, toolboxRect) : false;
-
-            dragRef.current = null;
-            setDraggingNodeId(null);
-            dragOverToolboxRef.current = false;
-            setDragOverToolbox(false);
-
-            if (droppedInToolbox) {
-                const idsToDelete = active?.draggedNodeIds || [node.id];
-
-                setDeletingNodeId(node.id);
-                setDragPreview(prev => prev || {
-                    nodeId: active?.nodeId || node.id,
-                    nodeType: active?.nodeType || node.type,
-                    x: nodeRect.left,
-                    y: nodeRect.top,
-                    offsetX: active?.offsetX || 0,
-                    offsetY: active?.offsetY || 0,
-                    deleting: false
-                });
-                setDragPreview(prev => (prev ? ({...prev, deleting: true}) : prev));
-
-                window.setTimeout(() => {
-                    removeNodesAndEdges(idsToDelete);
-                    setSelectedNodeIds(prev => prev.filter(id => !idsToDelete.includes(id)));
-                    setDeletingNodeId(null);
-                    setDragPreview(null);
-                }, 170);
-            } else {
-                setDragPreview(null);
-                setGraph(prev => ({
-                    ...prev,
-                    meta: {...prev.meta, updatedAt: new Date().toISOString()}
-                }));
-            }
-
-            window.removeEventListener('pointermove', onPointerMove);
-            window.removeEventListener('pointerup', onPointerUp);
-        };
-
-        window.addEventListener('pointermove', onPointerMove);
-        window.addEventListener('pointerup', onPointerUp);
+        beginDragForNodes(event, node, draggedNodeIds);
     };
+
+    const isDraggingSelectionGroup =
+        selectedNodeIds.length > 1 && draggingNodeId && selectedNodeIds.includes(draggingNodeId);
 
     const handleDragOver = event => {
         // keep HTML5 DnD for toolbox -> workbench
@@ -856,13 +876,18 @@ const WorkbenchPanel = ({ setMewGraph: dispatchSetMewGraph, mewGraph }) => {
 
             {!selectionBox && selectedBounds && selectedNodeIds.length > 1 && (
                 <div
-                    className={styles.selectionGroupBounds}
+                    className={[
+                        styles.selectionGroupBounds,
+                        styles.selectionGroupBoundsHandle,
+                        isDraggingSelectionGroup ? styles.selectionGroupBoundsDragging : ''
+                    ].join(' ')}
                     style={{
                         left: selectedBounds.left - 6,
                         top: selectedBounds.top - 6,
                         width: (selectedBounds.right - selectedBounds.left) + 12,
                         height: (selectedBounds.bottom - selectedBounds.top) + 12
                     }}
+                    onPointerDown={handleSelectionBoundsPointerDown}
                 />
             )}
 
