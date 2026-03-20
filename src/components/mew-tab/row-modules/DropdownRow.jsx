@@ -1,26 +1,33 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import styles from '../mew-tab.css';
 
 /**
- * DropdownRow – simple select‑box row module.
+ * DropdownRow – select-box row module.
  *
  * Props
- *  - label?         : optional text label shown before the control
- *  - options        : array of { value, label } items
- *  - value?         : current value
- *  - placeholder?   : shown when no value selected
- *  - onChange?      : fn(newValue) called when selection changes
- *  - id?            : optional identifier for the row
+ *  - label?         : optional text label
+ *  - options        : array of { value, label }
+ *  - value?         : controlled value (optional)
+ *  - defaultValue?  : initial/default selected value
+ *  - onChange?      : fn(newValue)
+ *  - id?            : optional identifier
  */
 const DropdownRow = ({
     label,
     options = [],
-    value = '',
-    placeholder = 'Select…',
+    value,
+    defaultValue = '',
     onChange,
     id,
 }) => {
-    const [selected, setSelected] = useState(value);
+    const computedDefault = defaultValue || (options[0]?.value ?? '');
+    const [selected, setSelected] = useState(
+        typeof value === 'string' ? value : computedDefault
+    );
+
+    useEffect(() => {
+        if (typeof value === 'string') setSelected(value);
+    }, [value]);
 
     const handleChange = (e) => {
         const v = e.target.value;
@@ -36,9 +43,6 @@ const DropdownRow = ({
                 value={selected}
                 onChange={handleChange}
             >
-                <option value="" disabled>
-                    {placeholder}
-                </option>
                 {options.map((opt) => (
                     <option key={opt.value} value={opt.value}>
                         {opt.label}

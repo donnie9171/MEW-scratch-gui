@@ -24,16 +24,12 @@ export const NODE_DEFINITIONS = {
             props: {
                 label: 'model',
                 options: [
-                    { value: 'gpt3.5 turbo', label: 'GPT3.5 Turbo' },
-                    { value: 'gemini', label: 'Gemini' },
+                    { value: 'gpt3.5 turbo', label: 'GPT3.5 Turbo' }
                 ],
-                placeholder: 'Choose a model',
+                defaultValue: 'gpt3.5 turbo'
             },
-            io: { 
-                input: { 
-                    portId: 'agent_in_value' 
-                }
-            } 
+            io: {
+            }
         },
     ],
 
