@@ -58,6 +58,56 @@ const WorkbenchPanel = ({ setMewGraph: dispatchSetMewGraph, mewGraph }) => {
 
     const edges = useMemo(() => deriveEdges(graph.nodes), [graph.nodes]);
 
+    const [selectedNodeIds, setSelectedNodeIds] = useState([]);
+    const [selectionBox, setSelectionBox] = useState(null);
+    const marqueeRef = useRef(null);
+
+    const isNodeSelected = nodeId => selectedNodeIds.includes(nodeId);
+
+    const selectOnlyNode = nodeId => {
+        setSelectedNodeIds([nodeId]);
+    };
+
+    const toggleNodeSelection = nodeId => {
+        setSelectedNodeIds(prev => (
+            prev.includes(nodeId)
+                ? prev.filter(id => id !== nodeId)
+                : [...prev, nodeId]
+        ));
+    };
+
+    const clearSelection = () => {
+        setSelectedNodeIds([]);
+    };
+
+    const normalizeRect = box => {
+        if (!box) return null;
+        return {
+            left: Math.min(box.x1, box.x2),
+            top: Math.min(box.y1, box.y2),
+            right: Math.max(box.x1, box.x2),
+            bottom: Math.max(box.y1, box.y2)
+        };
+    };
+
+    const getWorkbenchNodeRect = nodeId => {
+        const wb = workbenchRef.current;
+        if (!wb) return null;
+
+        const el = wb.querySelector(`[data-workbench-node-id="${nodeId}"]`);
+        if (!el) return null;
+
+        const wbRect = wb.getBoundingClientRect();
+        const r = el.getBoundingClientRect();
+
+        return {
+            left: r.left - wbRect.left + wb.scrollLeft,
+            top: r.top - wbRect.top + wb.scrollTop,
+            right: r.right - wbRect.left + wb.scrollLeft,
+            bottom: r.bottom - wbRect.top + wb.scrollTop
+        };
+    };
+
     const isRectOverlapping = (a, b) => (
         a.left < b.right &&
         a.right > b.left &&
@@ -223,6 +273,80 @@ const WorkbenchPanel = ({ setMewGraph: dispatchSetMewGraph, mewGraph }) => {
         });
     };
 
+    const computeMarqueeHitIds = box => {
+        const rect = normalizeRect(box);
+        if (!rect) return [];
+        return graph.nodes
+            .filter(n => {
+                const nr = getWorkbenchNodeRect(n.id);
+                return nr && isRectOverlapping(rect, nr);
+            })
+            .map(n => n.id);
+    };
+
+    const handleWorkbenchPointerDown = event => {
+        if (event.button !== 0) return;
+
+        const clickedNode = event.target.closest('[data-workbench-node-id]');
+        const clickedPort = event.target.closest('[data-port-direction]');
+        const interactive = event.target.closest('input, textarea, select, button, [contenteditable="true"]');
+        if (clickedNode || clickedPort || interactive) return;
+
+        event.preventDefault();
+
+        const start = toLocalCoords(event.clientX, event.clientY);
+        const initialBox = {x1: start.x, y1: start.y, x2: start.x, y2: start.y};
+
+        marqueeRef.current = {
+            start,
+            additive: event.shiftKey,
+            baseSelection: selectedNodeIds, // snapshot for additive selection
+            box: initialBox
+        };
+
+        if (!event.shiftKey) clearSelection();
+        setSelectionBox(initialBox);
+
+        const onMove = moveEvent => {
+            const m = marqueeRef.current;
+            if (!m) return;
+
+            const p = toLocalCoords(moveEvent.clientX, moveEvent.clientY);
+            const nextBox = {x1: m.start.x, y1: m.start.y, x2: p.x, y2: p.y};
+
+            m.box = nextBox;
+            setSelectionBox(nextBox);
+
+            // live selection update while dragging marquee
+            const hitIds = computeMarqueeHitIds(nextBox);
+            if (m.additive) {
+                setSelectedNodeIds(Array.from(new Set([...(m.baseSelection || []), ...hitIds])));
+            } else {
+                setSelectedNodeIds(hitIds);
+            }
+        };
+
+        const onUp = () => {
+            const m = marqueeRef.current;
+            marqueeRef.current = null;
+
+            // final sync (in case last move event was missed)
+            const hitIds = computeMarqueeHitIds(m?.box || initialBox);
+            if (m?.additive) {
+                setSelectedNodeIds(Array.from(new Set([...(m.baseSelection || []), ...hitIds])));
+            } else {
+                setSelectedNodeIds(hitIds);
+            }
+
+            setSelectionBox(null);
+            window.removeEventListener('pointermove', onMove);
+            window.removeEventListener('pointerup', onUp);
+        };
+
+        window.addEventListener('pointermove', onMove);
+        window.addEventListener('pointerup', onUp);
+    };
+
     const handlePortPointerDown = (event, meta) => {
         if (meta.direction !== 'output') return;
 
@@ -321,6 +445,13 @@ const WorkbenchPanel = ({ setMewGraph: dispatchSetMewGraph, mewGraph }) => {
 
         const interactive = event.target.closest('input, textarea, select, button, [contenteditable="true"]');
         if (interactive) return;
+
+        // Phase 1 selection behavior
+        if (event.shiftKey) {
+            toggleNodeSelection(node.id);
+        } else {
+            selectOnlyNode(node.id);
+        }
 
         event.preventDefault();
         setDraggingNodeId(node.id);
@@ -505,7 +636,13 @@ const WorkbenchPanel = ({ setMewGraph: dispatchSetMewGraph, mewGraph }) => {
     };
 
     return (
-        <div ref={workbenchRef} className={styles.workbench} onDragOver={handleDragOver} onDrop={handleDrop}>
+        <div
+            ref={workbenchRef}
+            className={styles.workbench}
+            onPointerDown={handleWorkbenchPointerDown}
+            onDragOver={handleDragOver}
+            onDrop={handleDrop}
+        >
             <svg
                 key={layoutVersion}
                 className={styles.connectionsLayer}
@@ -534,9 +671,11 @@ const WorkbenchPanel = ({ setMewGraph: dispatchSetMewGraph, mewGraph }) => {
             {graph.nodes.map(node => (
                 <div
                     key={node.id}
+                    data-workbench-node-id={node.id}
                     onPointerDown={event => handleNodePointerDown(event, node)}
                     className={[
                         styles.workbenchNode,
+                        isNodeSelected(node.id) ? styles.nodeSelected : '',
                         draggingNodeId === node.id ? styles.nodeDragging : '',
                         dragOverToolbox && draggingNodeId === node.id ? styles.nodeOverDeleteZone : '',
                         deletingNodeId === node.id ? styles.nodeDeleting : ''
@@ -559,6 +698,21 @@ const WorkbenchPanel = ({ setMewGraph: dispatchSetMewGraph, mewGraph }) => {
                     />
                 </div>
             ))}
+
+            {selectionBox && (() => {
+                const r = normalizeRect(selectionBox);
+                return (
+                    <div
+                        className={styles.selectionMarquee}
+                        style={{
+                            left: r.left,
+                            top: r.top,
+                            width: Math.max(1, r.right - r.left),
+                            height: Math.max(1, r.bottom - r.top)
+                        }}
+                    />
+                );
+            })()}
 
             {/* preview only exists while over toolbox (or delete animation) */}
             {dragPreview && ReactDOM.createPortal(

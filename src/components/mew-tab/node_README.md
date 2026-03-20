@@ -253,3 +253,10 @@ Notes:
 - `edges` are **derived** from `nodes[].outputs`.
 - Connection endpoint format is `{ nodeId, portId }` (not nodeId alone).
 - `outputs` is the write-source for connections; `inputs` may be derived/validated.
+
+
+
+## Node Selection
+- drag on empty space to area select
+- click on node to select, hold shift for multi select
+- once selected, can move or duplicate (popup window next to selection box)
