@@ -155,6 +155,7 @@ const WorkbenchPanel = ({
         suppressNextCheckpointRef.current = false;
     }, [dispatchSetMewGraph, graph]);
 
+
     const idCounterRef = useRef(0);
 
     const makeNodeId = type => {
@@ -875,40 +876,25 @@ const WorkbenchPanel = ({
     const isDraggingSelectionGroup =
         selectedNodeIds.length > 1 && draggingNodeId && selectedNodeIds.includes(draggingNodeId);
 
-    const handleDragOver = event => {
-        // keep HTML5 DnD for toolbox -> workbench
-        event.preventDefault();
-        event.dataTransfer.dropEffect = 'copy';
-    };
 
-    const handleDrop = event => {
-        event.preventDefault();
+    useEffect(() => {
+        const onToolboxDrop = event => {
+            const wb = workbenchRef.current;
+            if (!wb) return;
 
-        let nodeType = '';
-        let dragOffsetX = 0;
-        let dragOffsetY = 0;
+            const {nodeType, clientX, clientY, offsetX = 0, offsetY = 0} = event.detail || {};
+            if (!nodeType) return;
 
-        const raw = event.dataTransfer.getData('application/x-mew-node');
-        if (raw) {
-            try {
-                const parsed = JSON.parse(raw);
-                nodeType = parsed.nodeType || '';
-                dragOffsetX = Number(parsed.dragOffsetX) || 0;
-                dragOffsetY = Number(parsed.dragOffsetY) || 0;
-            } catch {
-                // fallback below
-            }
-        }
+            const r = wb.getBoundingClientRect();
+            const inside = clientX >= r.left && clientX <= r.right && clientY >= r.top && clientY <= r.bottom;
+            if (!inside) return;
 
-        if (!nodeType) nodeType = event.dataTransfer.getData('text/plain');
-        if (!nodeType) return;
+            addNodeAtPosition(nodeType, clientX - offsetX, clientY - offsetY);
+        };
 
-        addNodeAtPosition(
-            nodeType,
-            event.clientX - dragOffsetX,
-            event.clientY - dragOffsetY
-        );
-    };
+        window.addEventListener('mew-toolbox-drop', onToolboxDrop);
+        return () => window.removeEventListener('mew-toolbox-drop', onToolboxDrop);
+    }, [addNodeAtPosition]);
 
     const handleNodeModuleChange = ({nodeId, moduleId, newValue}) => {
         setGraph(prev => ({
@@ -932,11 +918,9 @@ const WorkbenchPanel = ({
 
     return (
         <div
-            ref={workbenchRef}
-            className={styles.workbench}
-            onPointerDown={handleWorkbenchPointerDown}
-            onDragOver={handleDragOver}
-            onDrop={handleDrop}
+    ref={workbenchRef}
+    className={styles.workbench}
+    onPointerDown={handleWorkbenchPointerDown}
         >
             <svg
                 key={layoutVersion}
