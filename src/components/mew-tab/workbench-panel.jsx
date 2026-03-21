@@ -91,6 +91,27 @@ const WorkbenchPanel = ({
         setSelectedNodeIds([]);
     };
 
+    const isEditableElement = el => {
+        if (!el) return false;
+        const tag = el.tagName?.toLowerCase();
+        return (
+            el.isContentEditable ||
+            tag === 'input' ||
+            tag === 'textarea' ||
+            tag === 'select'
+        );
+    };
+
+    const blurActiveEditableIfClickOff = target => {
+        const active = document.activeElement;
+        if (!isEditableElement(active)) return;
+
+        // keep focus if user clicked inside the currently focused editable
+        if (target && active.contains && active.contains(target)) return;
+
+        active.blur();
+    };
+
     const normalizeRect = box => {
         if (!box) return null;
         return {
@@ -703,6 +724,9 @@ const WorkbenchPanel = ({
     const handleWorkbenchPointerDown = event => {
         if (event.button !== 0) return;
 
+        // Click on empty workbench should remove input focus
+        blurActiveEditableIfClickOff(event.target);
+
         const clickedNode = event.target.closest('[data-workbench-node-id]');
         const clickedPort = event.target.closest('[data-port-direction]');
         const interactive = event.target.closest('input, textarea, select, button, [contenteditable="true"]');
@@ -861,6 +885,9 @@ const WorkbenchPanel = ({
 
         const interactive = event.target.closest('input, textarea, select, button, [contenteditable="true"]');
         if (interactive) return;
+
+        // Clicking node body (selection/drag handle) should remove input focus
+        blurActiveEditableIfClickOff(event.target);
 
         if (event.shiftKey) {
             toggleNodeSelection(node.id);
