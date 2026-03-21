@@ -18,15 +18,29 @@ import styles from './mew-tab.css';
  * @param {Object} [props.data] - Optional node-level data that can be passed to modules
  * @param {Function} [props.onModuleChange] - Optional callback when a module's data changes
  */
+
+const toNodeTypeClass = type => {
+    const safe = String(type || 'unknown')
+        .trim()
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-+|-+$/g, '');
+    return `mew-node-type-${safe || 'unknown'}`;
+};
+
 const Node = ({ id, type, modules = [], data = {}, onModuleChange, onPortPointerDown }) => {
     const handleModuleChange = (moduleId, newValue) => {
         if (onModuleChange) onModuleChange({nodeId: id, moduleId, newValue});
     };
 
     const moduleList = Array.isArray(modules) ? modules : (modules?.rows || []);
+    const nodeTypeClass = toNodeTypeClass(type);
 
     return (
-        <div className={styles.node} data-node-id={id} data-node-type={type}>
+        <div
+            className={`${styles.node} ${nodeTypeClass}`}
+            data-node-type={type}
+        >
             {moduleList.map((module, index) => {
                 const RowComponent = getRowModule(module.type);
                 if (!RowComponent) return null;

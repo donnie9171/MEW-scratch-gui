@@ -28,15 +28,14 @@ import { FaNoteSticky } from "react-icons/fa6";
 export const NODE_DEFINITIONS = {
     Agent: {
         rows: [
-            { id: 'state', type: 'status', props: {label: "Agent", icon: FaIdCardAlt}},
+            { id: 'state', type: 'status', props: {label: "Agent", icon: FaIdCardAlt},                 io: {
+                    input: {portId: 'in_value'},
+                    output: {portId: 'out_value'}
+                }},
             {
                 id: 'name',
                 type: 'textInput',
                 props: {label: 'Name', placeholder: 'Agent name'},
-                io: {
-                    input: {portId: 'in_value'},
-                    output: {portId: 'out_value'}
-                }
             },
             {
                 id: 'model',
@@ -62,7 +61,10 @@ export const NODE_DEFINITIONS = {
 
     Notepad: {
         rows: [
-            { id: 'state', type: 'status', props: {label: "Notepad", icon: BiSolidNotepad}},
+            { id: 'state', type: 'status', props: {label: "Notepad", icon: BiSolidNotepad},                 io: {
+                    input: {portId: 'in_value'},
+                    output: {portId: 'out_value'}
+                }},
             {id: 'name', type: 'textInput', props: {label: 'Name', placeholder: 'Notepad name'}}
         ],
         defaults: {
