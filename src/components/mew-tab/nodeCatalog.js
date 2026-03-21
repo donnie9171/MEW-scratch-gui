@@ -10,9 +10,25 @@
  * Backward compatibility: array-only definitions are still accepted.
  */
 
+import {BiSolidNotepad} from 'react-icons/bi';
+import { TbCalculatorFilled } from "react-icons/tb";
+import { RiRadarFill } from "react-icons/ri";
+import { TbBuildingBroadcastTowerFilled } from "react-icons/tb";
+import { TiMicrophone } from "react-icons/ti";
+import { FaIdCardAlt } from "react-icons/fa";
+import { FaGears } from "react-icons/fa6";
+import { LuAudioWaveform } from "react-icons/lu";
+import { FaNoteSticky } from "react-icons/fa6";
+
+
+
+
+
+
 export const NODE_DEFINITIONS = {
     Agent: {
         rows: [
+            { id: 'state', type: 'status', props: {label: "Agent", icon: FaIdCardAlt}},
             {
                 id: 'name',
                 type: 'textInput',
@@ -46,6 +62,7 @@ export const NODE_DEFINITIONS = {
 
     Notepad: {
         rows: [
+            { id: 'state', type: 'status', props: {label: "Notepad", icon: BiSolidNotepad}},
             {id: 'name', type: 'textInput', props: {label: 'Name', placeholder: 'Notepad name'}}
         ],
         defaults: {
@@ -58,30 +75,34 @@ export const NODE_DEFINITIONS = {
 
     Variable: {
         rows: [
+            { id: 'state', type: 'status', props: {label: "Variable", icon: TbCalculatorFilled}},
             {id: 'title', type: 'title', props: {text: 'Variable'}}
         ]
     },
 
     Receiver: {
         rows: [
+            { id: 'state', type: 'status', props: {label: "Receiver", icon: RiRadarFill}},
             {id: 'title', type: 'title', props: {text: 'Receiver'}}
         ]
     },
 
     Broadcaster: {
         rows: [
+            { id: 'state', type: 'status', props: {label: "Broadcaster", icon: TbBuildingBroadcastTowerFilled}},
             {id: 'title', type: 'title', props: {text: 'Broadcaster'}}
         ]
     },
 
     Comment: {
         rows: [
-            {id: 'title', type: 'title', props: {text: 'Comment'}}
+            { id: 'state', type: 'status', props: {label: "Comment", icon: FaNoteSticky}}
         ]
     },
 
     Microphone: {
         rows: [
+            { id: 'state', type: 'status', props: {label: "Microphone", icon: TiMicrophone}},
             {id: 'name', type: 'textInput', props: {label: 'Name', placeholder: 'Microphone name'}}
         ],
         defaults: {
@@ -94,6 +115,7 @@ export const NODE_DEFINITIONS = {
 
     Audio: {
         rows: [
+            { id: 'state', type: 'status', props: {label: "Audio", icon: LuAudioWaveform}},
             {id: 'name', type: 'textInput', props: {label: 'Name', placeholder: 'Audio name'}}
         ],
         defaults: {
@@ -103,9 +125,9 @@ export const NODE_DEFINITIONS = {
             ]
         }
     },
-
     Servo: {
         rows: [
+            { id: 'state', type: 'status', props: {label: "Servo", icon: FaGears}},
             {id: 'title', type: 'title', props: {text: 'Servo'}}
         ]
     }

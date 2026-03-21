@@ -146,6 +146,25 @@ When a node is created, defaults are resolved and written into that node instanc
 
 # Row modules and usage examples
 
+## Status row module (`type: "status"`)
+
+Use in catalog rows:
+- `{ id: 'state', type: 'status', props: { icon: <icon> } }`
+
+Props:
+- `icon`: node identity icon (string image URL, `{src, alt}` object, or React element)
+- `label` (optional): left text, defaults to `"State"`
+
+State source:
+- reads `node.data[stateRowId].value` (or `status` prop fallback)
+
+Supported states:
+- `"queued" | "running" | "error" | "complete" | "null"`
+
+Behavior:
+- right badge is shown for all states except `"null"`
+- `"null"` means node is not connected to the currently running cluster
+
 - title row  
     – read‑only header  
     – example usage in nodeCatalog:
@@ -260,3 +279,7 @@ Notes:
 - drag on empty space to area select
 - click on node to select, hold shift for multi select
 - once selected, can move or duplicate (popup window next to selection box)
+
+# Node runner logic
+- add a new row module (icon left and status badge right) so that the nodes can indicate their current state. node can have the follow states
+  -  "queued" | "running" | "error" | "complete" | "null" (null state are nodes not connected to the currently running cluster)

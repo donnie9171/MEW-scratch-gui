@@ -7,11 +7,14 @@
 import TitleRow from './TitleRow';
 import TextInputRow from './TextInputRow';
 import DropdownRow from './DropdownRow';
+import StatusRow from './StatusRow';
+
 
 const rowModuleRegistry = {
     title: TitleRow,
     textInput: TextInputRow,
     dropdown: DropdownRow,
+    status: StatusRow
 };
 
 /**

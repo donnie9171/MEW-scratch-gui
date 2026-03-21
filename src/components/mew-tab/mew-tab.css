@@ -371,3 +371,67 @@ $border-radius: 0.25rem;
     font-size: 0.85rem;
     line-height: 1.2;
 }
+
+.statusRow {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    min-height: 28px;
+    font-weight: bold;
+    color: white;
+}
+
+.statusLeft {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+}
+
+.statusIcon {
+    font-size: 12px;
+    line-height: 1;
+    opacity: 0.9;
+}
+
+.statusNodeIconSvg {
+    width: 25px;
+    height: 25px;
+    display: block;
+    color: white;
+}
+
+.statusBadge {
+    border-radius: 999px;
+    padding: 2px 8px;
+    font-size: 11px;
+    font-weight: 600;
+    line-height: 1.4;
+    border: 1px solid transparent;
+    white-space: nowrap;
+}
+
+.statusQueued {
+    color: #6b7280;
+    background: #f3f4f6;
+    border-color: #e5e7eb;
+}
+
+.statusRunning {
+    color: #1d4ed8;
+    background: #dbeafe;
+    border-color: #93c5fd;
+}
+
+.statusError {
+    color: #991b1b;
+    background: #fee2e2;
+    border-color: #fca5a5;
+}
+
+.statusComplete {
+    color: #166534;
+    background: #dcfce7;
+    border-color: #86efac;
+}
