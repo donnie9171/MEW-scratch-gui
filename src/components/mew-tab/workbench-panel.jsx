@@ -7,6 +7,8 @@ import styles from './mew-tab.css';
 import { connect } from 'react-redux';
 import {setMewGraph, getMewGraph, undoMewGraph, checkpointMewGraph} from '../../reducers/mew-graph';
 import {getActiveTabIndex, MEW_TAB_INDEX} from '../../reducers/editor-tab';
+import {areNodeIdsConnected, setNodesStatus} from './workbench/run';
+import { IoPlay } from 'react-icons/io5';
 
 import {
     createEmptyGraph,
@@ -73,6 +75,22 @@ const WorkbenchPanel = ({
     const isNodeSelected = nodeId => selectedNodeIds.includes(nodeId);
 
     const suppressNextCheckpointRef = useRef(false);
+
+    const STATUS_ROW_ID = 'state';
+
+    const canRunSelectedCluster = useMemo(
+        () => areNodeIdsConnected(graph.nodes, selectedNodeIds),
+        [graph.nodes, selectedNodeIds]
+    );
+
+    const handleRunSelected = () => {
+        if (!canRunSelectedCluster || !selectedNodeIds.length) return;
+        setGraph(prev => ({
+            ...prev,
+            nodes: setNodesStatus(prev.nodes, selectedNodeIds, 'running', STATUS_ROW_ID),
+            meta: {...prev.meta, updatedAt: new Date().toISOString()}
+        }));
+    };
 
 
     const selectOnlyNode = nodeId => {
@@ -1048,6 +1066,19 @@ const WorkbenchPanel = ({
                     }}
                     onPointerDown={e => e.stopPropagation()}
                 >
+                    {canRunSelectedCluster && (
+                        <button
+                            type="button"
+                            className={styles.selectionActionButton}
+                            onClick={handleRunSelected}
+                        >
+                            <IoPlay
+                                aria-hidden="true"
+                                style={{ color: '#22c55e', marginRight: 6, verticalAlign: 'middle' }}
+                            />
+                            Run
+                        </button>
+                    )}
                     <button
                         type="button"
                         className={styles.selectionActionButton}
