@@ -77,8 +77,22 @@ export const NODE_DEFINITIONS = {
 
     Variable: {
         rows: [
-            { id: 'state', type: 'status', props: {label: "Variable", icon: TbCalculatorFilled}},
-            {id: 'title', type: 'title', props: {text: 'Variable'}}
+            { id: 'state', type: 'status', props: {label: "Variable", icon: TbCalculatorFilled}, io: {
+                    input: {portId: 'in_value'},
+                    output: {portId: 'out_value'}
+                }},
+            {
+                id: 'variableName',
+                type: 'dropdown',
+                props: {
+                    label: 'variableName',
+                    options: [
+                        {value: 'myvariable', label: 'myvariable'}
+                    ],
+                    defaultValue: 'myvariable'
+                },
+                io: {}
+            }
         ]
     },
 

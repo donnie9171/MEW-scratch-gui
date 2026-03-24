@@ -7,7 +7,13 @@ import styles from './mew-tab.css';
 import { connect } from 'react-redux';
 import {setMewGraph, getMewGraph, undoMewGraph, checkpointMewGraph} from '../../reducers/mew-graph';
 import {getActiveTabIndex, MEW_TAB_INDEX} from '../../reducers/editor-tab';
-import {areNodeIdsConnected, setNodesStatus} from './workbench/run';
+import {
+    areNodeIdsConnected,
+    setNodesStatus,
+    createRunManager,
+    registerDefaultRunners,
+    resolveUpstreamStartNode
+} from './workbench/run';
 import { IoPlay } from 'react-icons/io5';
 
 import {
@@ -19,6 +25,7 @@ import {
 } from './workbench/graphState';
 
 const PROJECT_STORAGE_KEY = 'mew.project.graph.v1';
+const STATUS_ROW_ID = 'state';
 
 const loadInitialGraph = () => {
     if (typeof window === 'undefined') return createEmptyGraph();
@@ -51,6 +58,9 @@ const WorkbenchPanel = ({
     isMewTabActive
  }) => {
     const [graph, setGraph] = useState(() => mewGraph || loadLocalGraph() || createEmptyGraph());
+    const graphRef = useRef(graph);
+    const runManagerRef = useRef(null);
+    const isHydratingFromReduxRef = useRef(false);
     const lastAppliedReduxUpdatedAt = useRef(null);
     const [draggingNodeId, setDraggingNodeId] = useState(null);
     const [deletingNodeId, setDeletingNodeId] = useState(null);
@@ -76,20 +86,55 @@ const WorkbenchPanel = ({
 
     const suppressNextCheckpointRef = useRef(false);
 
-    const STATUS_ROW_ID = 'state';
-
     const canRunSelectedCluster = useMemo(
         () => areNodeIdsConnected(graph.nodes, selectedNodeIds),
         [graph.nodes, selectedNodeIds]
     );
 
-    const handleRunSelected = () => {
-        if (!canRunSelectedCluster || !selectedNodeIds.length) return;
-        setGraph(prev => ({
-            ...prev,
-            nodes: setNodesStatus(prev.nodes, selectedNodeIds, 'running', STATUS_ROW_ID),
-            meta: {...prev.meta, updatedAt: new Date().toISOString()}
-        }));
+    const handleRunSelected = async () => {
+        if (!canRunSelectedCluster || !selectedNodeIds.length) {
+            // eslint-disable-next-line no-console
+            console.warn('[MEW RUN DEBUG] run blocked: invalid selection', {selectedNodeIds});
+            return;
+        }
+
+        const startNodeId = resolveUpstreamStartNode(graph.nodes, selectedNodeIds);
+        if (!startNodeId) {
+            // eslint-disable-next-line no-console
+            console.warn('[MEW RUN DEBUG] run blocked: no upstream start node', {selectedNodeIds});
+            return;
+        }
+
+        if (!runManagerRef.current) {
+            // eslint-disable-next-line no-console
+            console.warn('[MEW RUN DEBUG] run blocked: run manager not ready');
+            return;
+        }
+
+        try {
+            await runManagerRef.current.runNodeCluster(startNodeId);
+            // eslint-disable-next-line no-console
+            console.log('[MEW RUN DEBUG] cluster complete', {
+                startNodeId,
+                selectedNodeIds,
+                runtimeState: runManagerRef.current.runtimeStore.getState()
+            });
+        } catch (error) {
+            const message = String(error?.message || error);
+            // eslint-disable-next-line no-console
+            console.error('[MEW RUN DEBUG] cluster failed', {
+                startNodeId,
+                selectedNodeIds,
+                error: message,
+                runtimeState: runManagerRef.current.runtimeStore.getState()
+            });
+
+            // Optional: friendlier cycle-specific log
+            if (/cycle/i.test(message)) {
+                // eslint-disable-next-line no-console
+                console.error('[MEW RUN DEBUG] cycle detected in selected cluster');
+            }
+        }
     };
 
 
@@ -189,10 +234,73 @@ const WorkbenchPanel = ({
     };
 
     useEffect(() => {
+        // If this render came from Redux hydration, skip pushing back to Redux.
+        if (isHydratingFromReduxRef.current) {
+            isHydratingFromReduxRef.current = false;
+            suppressNextCheckpointRef.current = false;
+            return;
+        }
         const checkpoint = !suppressNextCheckpointRef.current;
         dispatchSetMewGraph(graph, {checkpoint});
+        lastAppliedReduxUpdatedAt.current = graph?.meta?.updatedAt || null;
         suppressNextCheckpointRef.current = false;
     }, [dispatchSetMewGraph, graph]);
+
+    useEffect(() => {
+        graphRef.current = graph;
+    }, [graph]);
+
+    useEffect(() => {
+        registerDefaultRunners();
+
+        runManagerRef.current = createRunManager({
+            getGraph: () => graphRef.current,
+            applyNodeStatus: (nodeId, status) => {
+                suppressNextCheckpointRef.current = true;
+                setGraph(prev => ({
+                    ...prev,
+                    nodes: setNodesStatus(prev.nodes, [nodeId], status, STATUS_ROW_ID)
+                }));
+            },
+            applyNodeRuntimePatch: (nodeId, patch) => {
+                suppressNextCheckpointRef.current = true;
+                setGraph(prev => ({
+                    ...prev,
+                    nodes: prev.nodes.map(node => {
+                        if (node.id !== nodeId) return node;
+                        return {
+                            ...node,
+                            data: {
+                                ...(node.data || {}),
+                                __runtime: {
+                                    ...((node.data && node.data.__runtime) || {}),
+                                    ...patch
+                                }
+                            }
+                        };
+                    })
+                }));
+            },
+            onExecutionEvent: event => {
+                // eslint-disable-next-line no-console
+                console.log('[MEW RUN DEBUG] event', event);
+            }
+        });
+
+        if (typeof window !== 'undefined') {
+            window.__MEW_RUN_MANAGER__ = runManagerRef.current;
+        }
+    }, []);
+
+    useEffect(() => {
+        if (typeof window === 'undefined') return;
+        window.__MEW_RUN_DEBUG__ = {
+            runSelected: () => handleRunSelected(),
+            getRuntimeState: () => runManagerRef.current?.runtimeStore?.getState(),
+            resetRuntime: () => runManagerRef.current?.reset?.(),
+            getGraph: () => graphRef.current
+        };
+    }, [handleRunSelected, graph]);
 
 
     const idCounterRef = useRef(0);
@@ -480,18 +588,23 @@ const WorkbenchPanel = ({
     };
 
 
-    // Hydrate from imported project graph when Redux updates
     useEffect(() => {
-        if (!mewGraph) return;
+    if (!mewGraph) return;
 
-        const check = validateGraph(mewGraph);
-        if (!check.valid) return;
+    const check = validateGraph(mewGraph);
+    if (!check.valid) return;
 
-        const incomingUpdatedAt = mewGraph?.meta?.updatedAt || null;
-        if (incomingUpdatedAt && incomingUpdatedAt === lastAppliedReduxUpdatedAt.current) return;
+    const incomingUpdatedAt = mewGraph?.meta?.updatedAt || null;
+    const localUpdatedAt = graphRef.current?.meta?.updatedAt || null;
 
-        lastAppliedReduxUpdatedAt.current = incomingUpdatedAt;
-        setGraph(mewGraph);
+    // No-op if already same graph.
+    if (mewGraph === graphRef.current) return;
+    if (incomingUpdatedAt && incomingUpdatedAt === localUpdatedAt) return;
+    if (incomingUpdatedAt && incomingUpdatedAt === lastAppliedReduxUpdatedAt.current) return;
+
+    lastAppliedReduxUpdatedAt.current = incomingUpdatedAt;
+    isHydratingFromReduxRef.current = true;
+    setGraph(mewGraph);
     }, [mewGraph]);
 
     // Keep localStorage as fallback cache

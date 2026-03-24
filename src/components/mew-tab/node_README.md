@@ -281,5 +281,159 @@ Notes:
 - once selected, can move or duplicate (popup window next to selection box)
 
 # Node runner logic
+## Node states
 - add a new row module (icon left and status badge right) so that the nodes can indicate their current state. node can have the follow states
   -  "queued" | "running" | "error" | "complete" | "null" (null state are nodes not connected to the currently running cluster)
+
+## Node runner architecture overview for v1
+
+This runtime should keep the same high-level shape as the previous version
+(separate execution files, per-node runner classes), but adapted for React and
+the current multi-port graph model.
+
+Reference source files from previous implementation:
+- runManager_OLD.js
+- runNode_OLD.js
+
+### Runtime goals
+- Preserve maintainable runner architecture (one runner file per node type).
+- Decouple execution engine from DOM/window globals.
+- Support multi-input and multi-output ports correctly.
+- Preserve existing behavior: cluster run, sequential execution, fail-fast,
+  status transitions, and trigger provenance.
+
+### Required module structure
+
+Suggested folder: `src/components/mew-tab/workbench/run/`
+
+- graphEngineSequencing.js
+  - findClusters(nodes)
+  - topologicalSort(clusterNodes)
+  - identifyClusterForNode(nodeId, clusters)
+- graphEnginePorts.js
+  - getIncomingEdges(nodeId, nodes)
+  - getOutgoingEdges(nodeId, nodes)
+  - helpers for port-accurate input/output routing
+- runtimeStore.js
+  - getNodeById
+  - getNodeState
+  - setNodeState
+  - runningClusters
+- runNode.js
+  - base class contract for all node runners
+- runnerRegistry.js
+  - register(type/toolType, RunnerClass)
+  - getRunnerForNode(node)
+- runManager.js (ExecutionService)
+  - runNodeById(nodeId)
+  - runNodeCluster(nodeId)
+- runners/
+  - one file per node type (RunAgentNode.js, RunReceiverNode.js, etc.)
+
+### Core adaptation rule for multi-port graphs
+
+Use two separate graph interpretations:
+
+1. Sequencing graph (normalized, node-level)
+   - Used only for cluster discovery and topological ordering.
+   - Ignores port IDs and treats dependencies at node-to-node level.
+
+2. Data graph (port-accurate)
+   - Used during actual runner execution.
+   - Values must be read from and written to specific connected ports.
+   - Example edge shape:
+     - from: { nodeId, outPortId }
+     - to: { nodeId, inPortId }
+
+Important:
+- Normalization is allowed for run sequence only.
+- Runtime value propagation must remain port-accurate.
+
+### Runtime state model (current architecture)
+
+Node graph model:
+- node: { id, type, toolType?, inputs, outputs, data }
+- inputs/outputs are port maps, not plain node-id arrays.
+
+Execution state model (runtimeStore):
+- nodesState keyed by node ID
+- include:
+  - cluster
+  - sortOrder
+  - runStatus: queued | running | error | complete | null
+  - outputsByPort (recommended)
+  - error/debug metadata (optional)
+
+### Execution lifecycle (cluster run)
+
+Inside runNodeCluster(nodeId):
+1. Build all clusters.
+2. Find cluster containing nodeId.
+3. Compute topological order for that cluster.
+4. Mark selected cluster as running.
+5. Set node statuses to queued.
+6. Execute nodes sequentially in order:
+   - set running
+   - await runner.run(triggerContext)
+   - set complete on success
+   - set error and stop cluster on failure
+7. Remove cluster from runningClusters.
+
+Trigger provenance:
+- Preserve triggeredBy semantics from old version.
+- Trigger context should include source node and source port where possible.
+
+### Runner abstraction
+
+Base class in runNode.js should expose:
+- constructor(node, context)
+- async run(triggerContext)
+- getInput(inPortId)
+- getAllInputs()
+- setOutput(outPortId, value)
+
+Each concrete runner remains in its own file and focuses only on node-specific
+logic.
+
+### React integration contract
+
+Execution engine must not call querySelector or mutate DOM directly.
+
+Use injected callbacks/services:
+- getGraph()
+- applyNodeStatus(nodeId, status)
+- applyNodeRuntimePatch(nodeId, patch)
+- onExecutionEvent(event)
+
+UI responsibilities:
+- Status badges read from node.data/state.
+- Tooltips/debug labels derived in React render.
+
+### Behavior to preserve
+- Connected-component execution from any selected node.
+- Topological ordering by dependency.
+- Sequential async execution with fail-fast per cluster.
+- Status transitions: queued -> running -> complete/error.
+- Runner mapping by type/toolType with fallback to base runner.
+
+### Recommended upgrades
+- Replace globals with dependency injection.
+- Emit lifecycle events for observability:
+  - onNodeQueued
+  - onNodeStarted
+  - onNodeCompleted
+  - onNodeFailed
+- Detect cycles and surface user-facing validation errors.
+- Add cancellation via AbortController.
+- Optionally support parallel execution for independent branches.
+
+### Implementation order
+1. Build sequencing graph engine.
+2. Build port-accurate edge/input-output helpers.
+3. Build runtime store and base RunNode.
+4. Build runner registry.
+5. Build runManager cluster execution flow.
+6. Port runners one-by-one into separate files.
+7. Connect Run button to runManager.
+8. Add tests for sequence, ports, status transitions, and fail-fast behavior.
+
