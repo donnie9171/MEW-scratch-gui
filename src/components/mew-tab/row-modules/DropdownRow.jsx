@@ -19,6 +19,8 @@ const DropdownRow = ({
     defaultValue = '',
     onChange,
     id,
+    embedded = false,
+    compact = false,
 }) => {
     const computedDefault = defaultValue || (options[0]?.value ?? '');
     const [selected, setSelected] = useState(
@@ -35,11 +37,21 @@ const DropdownRow = ({
         if (onChange) onChange(v);
     };
 
+    const rowClassName = [
+        styles.dropdownRow,
+        embedded ? styles.dropdownRowEmbedded : null
+    ].filter(Boolean).join(' ');
+
+    const selectClassName = [
+        styles.selectField,
+        compact ? styles.selectFieldCompact : null
+    ].filter(Boolean).join(' ');
+
     return (
-        <div className={styles.dropdownRow} data-id={id}>
+        <div className={rowClassName} data-id={id}>
             {/* {label && <label className={styles.inputLabel}>{label}:</label>} */}
             <select
-                className={styles.selectField}
+                className={selectClassName}
                 value={selected}
                 onChange={handleChange}
             >

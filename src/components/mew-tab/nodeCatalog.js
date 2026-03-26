@@ -30,15 +30,18 @@ import {createEmptyTemplateValue} from './row-modules/utils/notepadTemplateValue
 export const NODE_DEFINITIONS = {
     Agent: {
         rows: [
-            { id: 'state', type: 'status', props: {label: "Agent", icon: FaIdCardAlt},                 io: {
+            { id: 'state', type: 'status', props: {
+                    label: "Agent",
+                    icon: FaIdCardAlt,
+                    centerModule: {
+                        type: 'textInput',
+                        rowId: 'name',
+                        props: {placeholder: 'Agent name'}
+                    }
+                },                 io: {
                     input: {portId: 'in_value'},
                     output: {portId: 'out_value'}
                 }},
-            {
-                id: 'name',
-                type: 'textInput',
-                props: {label: 'Name', placeholder: 'Agent name'},
-            },
             {
                 id: 'model',
                 type: 'dropdown',
@@ -63,11 +66,18 @@ export const NODE_DEFINITIONS = {
 
     Notepad: {
         rows: [
-            { id: 'state', type: 'status', props: {label: "Notepad", icon: BiSolidNotepad}, io: {
+            { id: 'state', type: 'status', props: {
+                label: "Notepad",
+                icon: BiSolidNotepad,
+                centerModule: {
+                    type: 'textInput',
+                    rowId: 'name',
+                    props: {placeholder: 'Notepad name'}
+                }
+            }, io: {
                 input: {portId: 'in_value'},
                 output: {portId: 'out_value'}
             }},
-            {id: 'name', type: 'textInput', props: {label: 'Name', placeholder: 'Notepad name'}},
             {id: 'prompt', type: 'notepadTemplate', props: {}}
         ],
         defaults: {
@@ -81,22 +91,23 @@ export const NODE_DEFINITIONS = {
 
     Variable: {
         rows: [
-            { id: 'state', type: 'status', props: {label: "Variable", icon: TbCalculatorFilled}, io: {
+            { id: 'state', type: 'status', props: {
+                    label: "Variable",
+                    icon: TbCalculatorFilled,
+                    centerModule: {
+                        type: 'dropdown',
+                        rowId: 'variableName',
+                        props: {
+                            options: [
+                                {value: 'myvariable', label: 'myvariable'}
+                            ],
+                            defaultValue: 'myvariable'
+                        }
+                    }
+                }, io: {
                     input: {portId: 'in_value'},
                     output: {portId: 'out_value'}
-                }},
-            {
-                id: 'variableName',
-                type: 'dropdown',
-                props: {
-                    label: 'variableName',
-                    options: [
-                        {value: 'myvariable', label: 'myvariable'}
-                    ],
-                    defaultValue: 'myvariable'
-                },
-                io: {}
-            }
+                }}
         ]
     },
 

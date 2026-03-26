@@ -47,6 +47,30 @@ const Node = ({ id, type, modules = [], data = {}, onModuleChange, onPortPointer
 
                 const rowData = data[module.id] || {};
                 const rowContext = rowContextById[module.id] || {};
+                const moduleProps = {...(module.props || {})};
+
+                if (module.type === 'status' && moduleProps.centerModule) {
+                    const centerDefinition = moduleProps.centerModule;
+                    const centerType = centerDefinition?.type;
+
+                    if (centerType) {
+                        const CenterRowComponent = getRowModule(centerType);
+                        const centerRowId = centerDefinition?.rowId || module.id;
+                        const centerRowData = data[centerRowId] || {};
+                        const centerProps = centerDefinition?.props || {};
+
+                        moduleProps.centerContent = (
+                            <CenterRowComponent
+                                id={centerRowId}
+                                {...centerProps}
+                                value={centerRowData.value}
+                                onChange={(newValue) => handleModuleChange(centerRowId, newValue)}
+                                embedded
+                                compact
+                            />
+                        );
+                    }
+                }
 
                 return (
                     <div key={module.id || index} className={styles.rowModule}>
@@ -58,7 +82,7 @@ const Node = ({ id, type, modules = [], data = {}, onModuleChange, onPortPointer
                         />
                         <RowComponent
                             id={module.id}
-                            {...module.props}
+                            {...moduleProps}
                             {...rowContext}
                             value={rowData.value}
                             onChange={(newValue) => handleModuleChange(module.id, newValue)}

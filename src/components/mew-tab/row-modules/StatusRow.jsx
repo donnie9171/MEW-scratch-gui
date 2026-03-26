@@ -40,7 +40,7 @@ const renderIcon = icon => {
     return null;
 };
 
-const StatusRow = ({label = 'Node name', value, status, icon}) => {
+const StatusRow = ({label = 'Node name', value, status, icon, centerContent}) => {
     const key = normalizeStatus(value ?? status);
     const meta = STATUS_META[key];
     const showBadge = key !== 'null';
@@ -49,7 +49,11 @@ const StatusRow = ({label = 'Node name', value, status, icon}) => {
         <div className={styles.statusRow} data-row-type="status">
             <div className={styles.statusLeft}>
                 {icon ? <span className={styles.statusNodeIcon}>{renderIcon(icon)}</span> : null}
-                <span className={styles.statusLabel}>{label}</span>
+                {centerContent ? (
+                    <span className={styles.statusCenterContent}>{centerContent}</span>
+                ) : (
+                    <span className={styles.statusLabel}>{label}</span>
+                )}
             </div>
             {showBadge ? <span className={`${styles.statusBadge} ${meta.className}`}>{meta.label}</span> : null}
         </div>

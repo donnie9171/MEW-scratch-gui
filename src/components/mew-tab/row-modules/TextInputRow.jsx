@@ -12,7 +12,7 @@ import styles from '../mew-tab.css';
  * @param {Function} [props.onChange] - Callback when value changes
  * @param {string} [props.id] - Optional unique identifier
  */
-const TextInputRow = ({ label, placeholder = '', value = '', onChange, id }) => {
+const TextInputRow = ({ label, placeholder = '', value = '', onChange, id, embedded = false, compact = false }) => {
     const [inputValue, setInputValue] = useState(value);
 
     const handleChange = (event) => {
@@ -23,12 +23,22 @@ const TextInputRow = ({ label, placeholder = '', value = '', onChange, id }) => 
         }
     };
 
+    const rowClassName = [
+        styles.textInputRow,
+        embedded ? styles.textInputRowEmbedded : null
+    ].filter(Boolean).join(' ');
+
+    const inputClassName = [
+        styles.inputField,
+        compact ? styles.inputFieldCompact : null
+    ].filter(Boolean).join(' ');
+
     return (
-        <div className={styles.textInputRow} data-id={id}>
+        <div className={rowClassName} data-id={id}>
             {/* {label && <label className={styles.inputLabel}>{label}:</label>} */}
             <input
                 type="text"
-                className={styles.inputField}
+                className={inputClassName}
                 placeholder={placeholder}
                 value={inputValue}
                 onChange={handleChange}

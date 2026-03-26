@@ -37,7 +37,7 @@ $border-radius: 0.25rem;
 }
 
 .toolbox {
-    width: 240px;
+    width: 250px;
     min-width: 180px;
     max-width: 320px;
     background: $mew-background;
@@ -389,6 +389,27 @@ $border-radius: 0.25rem;
     align-items: center;
     gap: 6px;
     min-width: 0;
+    flex: 1 1 auto;
+}
+
+.statusCenterContent {
+    flex: 1 1 auto;
+    min-width: 0;
+    display: inline-flex;
+    align-items: center;
+}
+
+.statusLabel {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.statusNodeIcon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 auto;
 }
 
 .statusIcon {
@@ -402,6 +423,50 @@ $border-radius: 0.25rem;
     height: 25px;
     display: block;
     color: inherit; /* use node text color */
+}
+
+.statusNodeIconImg {
+    width: 25px;
+    height: 25px;
+    display: block;
+    object-fit: contain;
+}
+
+.textInputRow,
+.dropdownRow {
+    width: 100%;
+    display: flex;
+    align-items: center;
+}
+
+.textInputRowEmbedded,
+.dropdownRowEmbedded {
+    width: 100%;
+}
+
+.inputField,
+.selectField {
+    width: 100%;
+    min-width: 0;
+    border: 1px solid rgba(255, 255, 255, 0.35);
+    border-radius: 6px;
+    padding: 4px 8px;
+    font-size: 12px;
+    line-height: 1.25;
+    color: #111827;
+    background: #ffffff;
+    box-sizing: border-box;
+}
+
+.inputFieldCompact,
+.selectFieldCompact {
+    height: 24px;
+    padding-top: 2px;
+    padding-bottom: 2px;
+}
+
+.inputField::placeholder {
+    color: #6b7280;
 }
 
 .statusBadge {
