@@ -549,7 +549,44 @@ $border-radius: 0.25rem;
 
 .notepadTemplateListCellBody {
     min-height: 32px;
-    padding: 8px;
+    padding: 6px;
+}
+
+.notepadTemplateCellTextInput {
+    width: 100%;
+    min-height: 30px;
+    border: 1px solid rgba(0, 0, 0, 0.18);
+    border-radius: 6px;
+    padding: 6px 8px;
+    font-size: 12px;
+    font-family: Arial, Helvetica, sans-serif;
+    resize: vertical;
+    overflow-y: scroll;
+    line-height: 1.3;
+    color: #111827;
+    background: #ffffff;
+    box-sizing: border-box;
+    margin-bottom: -4px;
+}
+
+.notepadTemplatePlaceholderCell {
+    width: 100%;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    border: 1px solid #2499ff;
+    border-radius: 6px;
+    padding: 6px 8px;
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 1.3;
+    box-sizing: border-box;
+}
+
+.notepadTemplatePlaceholderIcon {
+    width: 14px;
+    height: 14px;
+    flex: 0 0 auto;
 }
 
 .notepadTemplateListCellDropBefore {
@@ -653,6 +690,50 @@ $border-radius: 0.25rem;
     font-size: 20px;
     line-height: 1;
     cursor: pointer;
+}
+
+.notepadTemplateAddWrap {
+    position: relative;
+}
+
+.notepadTemplateAddMenu {
+    position: absolute;
+    left: calc(100% + 8px);
+    top: 0;
+    min-width: 190px;
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    border-radius: 8px;
+    background: #ffffff;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+    padding: 6px;
+    z-index: 15;
+}
+
+.notepadTemplateAddMenuItem {
+    width: 100%;
+    border: 0;
+    border-radius: 6px;
+    background: transparent;
+    color: #111827;
+    font-size: 12px;
+    line-height: 1.3;
+    text-align: left;
+    padding: 7px 8px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 7px;
+}
+
+.notepadTemplateAddMenuItem:hover {
+    background: #f3f4f6;
+}
+
+.notepadTemplateAddMenuSwatch {
+    width: 10px;
+    height: 10px;
+    border-radius: 999px;
+    flex: 0 0 auto;
 }
 
 .notepadTemplateAddButton:hover {

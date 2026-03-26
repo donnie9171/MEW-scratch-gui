@@ -68,7 +68,7 @@ export const NODE_DEFINITIONS = {
                 output: {portId: 'out_value'}
             }},
             {id: 'name', type: 'textInput', props: {label: 'Name', placeholder: 'Notepad name'}},
-            {id: 'prompt', type: 'notepadTemplate', props: {placeholder: 'Compose prompt with placeholders...'}}
+            {id: 'prompt', type: 'notepadTemplate', props: {}}
         ],
         defaults: {
             scope: 'nodeType',

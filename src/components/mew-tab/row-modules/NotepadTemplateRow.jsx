@@ -1,38 +1,198 @@
-import React, {useCallback, useEffect, useState} from 'react';
+import React, {useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState} from 'react';
+import {BiSolidNotepad} from 'react-icons/bi';
+import {TbCalculatorFilled, TbBuildingBroadcastTowerFilled} from 'react-icons/tb';
+import {RiRadarFill} from 'react-icons/ri';
+import {TiMicrophone} from 'react-icons/ti';
+import {FaIdCardAlt} from 'react-icons/fa';
+import { FaNoteSticky } from "react-icons/fa6";
+
+import {FaGears} from 'react-icons/fa6';
+import {LuAudioWaveform} from 'react-icons/lu';
 import styles from '../mew-tab.css';
-import {createTextSegment, normalizeTemplateValue} from './utils/notepadTemplateValue';
+import {
+    createTextSegment,
+    createTokenSegment,
+    normalizeTemplateValue
+} from './utils/notepadTemplateValue';
 
 const createItemId = () => `item_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+
+const SOURCE_NODE_COLOR_BY_TYPE = {
+    receiver: '#ffab19',
+    broadcaster: '#ffab19',
+    agent: '#2499ff',
+    variable: '#ff8c17',
+    notepad: '#5ac05b',
+    costume: '#9965ff',
+    comment: '#ffe646',
+    gate: '#ff4949',
+    servo: '#4fccf3',
+    audio: '#d062d2',
+    microphone: '#ff1717'
+};
+
+const SOURCE_NODE_ICON_BY_TYPE = {
+    receiver: RiRadarFill,
+    broadcaster: TbBuildingBroadcastTowerFilled,
+    agent: FaIdCardAlt,
+    variable: TbCalculatorFilled,
+    notepad: BiSolidNotepad,
+    comment: FaNoteSticky,
+    servo: FaGears,
+    audio: LuAudioWaveform,
+    microphone: TiMicrophone
+};
+
+const getSourceColor = sourceNodeType => {
+    const key = String(sourceNodeType || '').trim().toLowerCase();
+    return SOURCE_NODE_COLOR_BY_TYPE[key] || '#2499ff';
+};
+
+const getSourceIcon = sourceNodeType => {
+    const key = String(sourceNodeType || '').trim().toLowerCase();
+    return SOURCE_NODE_ICON_BY_TYPE[key] || null;
+};
+
+const toSourceLabel = source => (
+    source?.label || source?.sourceNodeType || source?.sourceNodeId || 'Source'
+);
 
 const normalizeListItems = value => {
     if (Array.isArray(value?.listItems)) {
         return value.listItems.map(item => {
             if (item && typeof item === 'object') {
+                if (item.type === 'placeholder') {
+                    return {
+                        id: String(item.id || createItemId()),
+                        type: 'placeholder',
+                        sourceNodeId: String(item.sourceNodeId || ''),
+                        sourcePortId: String(item.sourcePortId || 'out_value'),
+                        label: String(item.label || toSourceLabel(item)),
+                        sourceNodeType: String(item.sourceNodeType || ''),
+                        resolverField: item.resolverField ? String(item.resolverField) : null
+                    };
+                }
+
                 return {
                     id: String(item.id || createItemId()),
+                    type: 'text',
                     content: typeof item.content === 'string' ? item.content : ''
                 };
             }
 
             return {
                 id: createItemId(),
+                type: 'text',
                 content: String(item || '')
             };
         });
     }
 
-    return [];
+    const normalized = normalizeTemplateValue(value);
+    const nextItems = [];
+    let textBuffer = '';
+
+    const flushText = () => {
+        if (!textBuffer) return;
+        nextItems.push({
+            id: createItemId(),
+            type: 'text',
+            content: textBuffer
+        });
+        textBuffer = '';
+    };
+
+    normalized.segments.forEach(segment => {
+        if (segment.type === 'text') {
+            textBuffer += segment.text || '';
+            return;
+        }
+
+        if (segment.type === 'token') {
+            flushText();
+            nextItems.push({
+                id: createItemId(),
+                type: 'placeholder',
+                sourceNodeId: String(segment.sourceNodeId || ''),
+                sourcePortId: String(segment.sourcePortId || 'out_value'),
+                label: String(segment.alias || segment.label || segment.sourceNodeId || 'Source'),
+                sourceNodeType: '',
+                resolverField: segment.resolverField ? String(segment.resolverField) : null
+            });
+        }
+    });
+
+    flushText();
+    return nextItems;
 };
 
 const toNextTemplateValue = (currentValue, listItems) => {
     const normalized = normalizeTemplateValue(currentValue);
+    const segments = [];
+
+    listItems.forEach((item, index) => {
+        if (item.type === 'placeholder' && item.sourceNodeId) {
+            segments.push(createTokenSegment({
+                sourceNodeId: item.sourceNodeId,
+                sourcePortId: item.sourcePortId || 'out_value',
+                label: item.label || toSourceLabel(item),
+                resolverField: item.resolverField || null
+            }));
+        } else {
+            segments.push(createTextSegment(item.content || ''));
+        }
+
+        if (index < listItems.length - 1) {
+            segments.push(createTextSegment('\n'));
+        }
+    });
 
     return {
         ...normalized,
         listItems,
-        // Keep a plain text fallback so current runners still receive a stable template shape.
-        segments: [createTextSegment(listItems.map(item => item.content).join('\n'))]
+        segments: segments.length ? segments : [createTextSegment('')]
     };
+};
+
+const syncPlaceholdersWithSources = (listItems, sourceOptions) => {
+    const sourceByKey = new Map(
+        sourceOptions.map(source => [
+            `${source.sourceNodeId || ''}:${source.sourcePortId || 'out_value'}`,
+            source
+        ])
+    );
+
+    let changed = false;
+
+    const nextItems = listItems.map(item => {
+        if (item.type !== 'placeholder') return item;
+
+        const key = `${item.sourceNodeId || ''}:${item.sourcePortId || 'out_value'}`;
+        const latestSource = sourceByKey.get(key);
+        if (!latestSource) return item;
+
+        const nextLabel = latestSource.label || item.label || 'Source';
+        const nextSourceNodeType = latestSource.sourceNodeType || '';
+        const nextResolverField = latestSource.resolverField || null;
+
+        if (
+            nextLabel === item.label &&
+            nextSourceNodeType === (item.sourceNodeType || '') &&
+            nextResolverField === (item.resolverField || null)
+        ) {
+            return item;
+        }
+
+        changed = true;
+        return {
+            ...item,
+            label: nextLabel,
+            sourceNodeType: nextSourceNodeType,
+            resolverField: nextResolverField
+        };
+    });
+
+    return changed ? nextItems : listItems;
 };
 
 const reorderListItems = (items, dragId, overId, insertAfter) => {
@@ -61,8 +221,10 @@ const reorderListItems = (items, dragId, overId, insertAfter) => {
 const NotepadListCell = ({
     item,
     index,
+    placeholder,
     renderListCell,
     onDelete,
+    onTextChange,
     onHandleDragStart,
     onHandleDragEnd,
     onCellDragOver,
@@ -72,9 +234,52 @@ const NotepadListCell = ({
     isDropAfter
 }) => {
     const classNames = [styles.notepadTemplateListCell];
+    const textAreaRef = useRef(null);
     if (isDragging) classNames.push(styles.notepadTemplateListCellDragging);
     if (isDropBefore) classNames.push(styles.notepadTemplateListCellDropBefore);
     if (isDropAfter) classNames.push(styles.notepadTemplateListCellDropAfter);
+    const customContent = typeof renderListCell === 'function' ? renderListCell({item, index}) : null;
+    const PlaceholderIcon = getSourceIcon(item.sourceNodeType);
+
+    useLayoutEffect(() => {
+        if (item.type !== 'text') return;
+
+        const el = textAreaRef.current;
+        if (!el) return;
+
+        const resizeToContent = () => {
+            el.style.height = 'auto';
+            el.style.height = `${el.scrollHeight}px`;
+        };
+
+        // Run now and again on next frame to catch late width/layout hydration.
+        resizeToContent();
+        const rafId = window.requestAnimationFrame(resizeToContent);
+        const timerId = window.setTimeout(resizeToContent, 0);
+
+        let observer = null;
+        if (typeof ResizeObserver !== 'undefined') {
+            observer = new ResizeObserver(() => {
+                resizeToContent();
+            });
+            observer.observe(el);
+        }
+
+        window.addEventListener('resize', resizeToContent);
+
+        return () => {
+            window.cancelAnimationFrame(rafId);
+            window.clearTimeout(timerId);
+            if (observer) observer.disconnect();
+            window.removeEventListener('resize', resizeToContent);
+        };
+    }, [item.id, item.content, item.type]);
+
+    const handleTextInput = event => {
+        const el = event.currentTarget;
+        el.style.height = 'auto';
+        el.style.height = `${el.scrollHeight}px`;
+    };
 
     return (
         <div
@@ -115,11 +320,31 @@ const NotepadListCell = ({
             </div>
 
             <div className={styles.notepadTemplateListCellBody}>
-                {typeof renderListCell === 'function' ? renderListCell({item, index}) : (
-                    <div>
-                        {item.id}
+                {customContent || (item.type === 'placeholder' ? (
+                    <div
+                        className={styles.notepadTemplatePlaceholderCell}
+                        style={{
+                            backgroundColor: `${getSourceColor(item.sourceNodeType)}`,
+                            borderColor: getSourceColor(item.sourceNodeType),
+                            color: '#ffffff'
+                        }}
+                    >
+                        {PlaceholderIcon ? (
+                            <PlaceholderIcon className={styles.notepadTemplatePlaceholderIcon} />
+                        ) : null}
+                        {item.label || 'Source'}
                     </div>
-                )}
+                ) : (
+                    <textarea
+                        ref={textAreaRef}
+                        className={styles.notepadTemplateCellTextInput}
+                        value={item.content || ''}
+                        onChange={event => onTextChange(item.id, event.target.value)}
+                        onInput={handleTextInput}
+                        placeholder={placeholder || 'Type text...'}
+                        rows={1}
+                    />
+                ))}
             </div>
         </div>
     );
@@ -134,33 +359,102 @@ const NotepadTemplateRow = ({
     renderListCell
 }) => {
     const [listItems, setListItems] = useState(() => normalizeListItems(value));
+    const [isAddMenuOpen, setIsAddMenuOpen] = useState(false);
     const [dragState, setDragState] = useState({
         dragId: null,
         overId: null,
         insertAfter: false
     });
+    const addMenuRef = useRef(null);
 
     useEffect(() => {
         setListItems(normalizeListItems(value));
     }, [value]);
 
-    const handleAddItem = useCallback(() => {
-        const nextItems = listItems.concat([{id: createItemId(), content: ''}]);
-        setListItems(nextItems);
+    const sourceOptions = useMemo(() => {
+        const raw = Array.isArray(upstreamSources) ? upstreamSources.filter(Boolean) : [];
+        const dedup = new Map();
 
+        raw.forEach(source => {
+            const key = `${source.sourceNodeId || ''}:${source.sourcePortId || 'out_value'}`;
+            if (!dedup.has(key)) {
+                dedup.set(key, {
+                    sourceNodeId: String(source.sourceNodeId || ''),
+                    sourcePortId: String(source.sourcePortId || 'out_value'),
+                    label: String(toSourceLabel(source)),
+                    sourceNodeType: String(source.sourceNodeType || ''),
+                    resolverField: source.resolverFieldUsed ? String(source.resolverFieldUsed) : null
+                });
+            }
+        });
+
+        return Array.from(dedup.values());
+    }, [upstreamSources]);
+
+    useEffect(() => {
+        if (!isAddMenuOpen) return undefined;
+
+        const handlePointerDown = event => {
+            if (!addMenuRef.current) return;
+            if (addMenuRef.current.contains(event.target)) return;
+            setIsAddMenuOpen(false);
+        };
+
+        document.addEventListener('mousedown', handlePointerDown);
+        return () => document.removeEventListener('mousedown', handlePointerDown);
+    }, [isAddMenuOpen]);
+
+    const applyListItems = useCallback(nextItems => {
+        setListItems(nextItems);
         if (onChange) {
             onChange(toNextTemplateValue(value, nextItems));
         }
-    }, [listItems, onChange, value]);
+    }, [onChange, value]);
+
+    useEffect(() => {
+        const syncedItems = syncPlaceholdersWithSources(listItems, sourceOptions);
+        if (syncedItems !== listItems) {
+            applyListItems(syncedItems);
+        }
+    }, [applyListItems, listItems, sourceOptions]);
+
+    const handleAddTextItem = useCallback(() => {
+        const nextItems = listItems.concat([{id: createItemId(), type: 'text', content: ''}]);
+        applyListItems(nextItems);
+        setIsAddMenuOpen(false);
+    }, [applyListItems, listItems]);
+
+    const handleAddSourceItem = useCallback(source => {
+        const nextItems = listItems.concat([{
+            id: createItemId(),
+            type: 'placeholder',
+            sourceNodeId: source.sourceNodeId,
+            sourcePortId: source.sourcePortId || 'out_value',
+            label: source.label || toSourceLabel(source),
+            sourceNodeType: source.sourceNodeType || '',
+            resolverField: source.resolverField || null
+        }]);
+        applyListItems(nextItems);
+        setIsAddMenuOpen(false);
+    }, [applyListItems, listItems]);
+
+    const handleToggleAddMenu = useCallback(() => {
+        setIsAddMenuOpen(prev => !prev);
+    }, []);
 
     const handleDeleteItem = useCallback(itemId => {
         const nextItems = listItems.filter(item => item.id !== itemId);
-        setListItems(nextItems);
+        applyListItems(nextItems);
+    }, [applyListItems, listItems]);
 
-        if (onChange) {
-            onChange(toNextTemplateValue(value, nextItems));
-        }
-    }, [listItems, onChange, value]);
+    const handleTextCellChange = useCallback((itemId, nextText) => {
+        const nextItems = listItems.map(item => {
+            if (item.id !== itemId) return item;
+            if (item.type !== 'text') return item;
+            return {...item, content: nextText};
+        });
+        applyListItems(nextItems);
+    }, [applyListItems, listItems]);
 
     const handleHandleDragStart = useCallback((event, dragId) => {
         event.dataTransfer.effectAllowed = 'move';
@@ -216,17 +510,10 @@ const NotepadTemplateRow = ({
             dragState.overId === overId ? dragState.insertAfter : fallbackInsertAfter;
 
         const nextItems = reorderListItems(listItems, dragId, overId, insertAfter);
-        setListItems(nextItems);
-
-        if (onChange) {
-            onChange(toNextTemplateValue(value, nextItems));
-        }
+        applyListItems(nextItems);
 
         handleHandleDragEnd();
-    }, [dragState, handleHandleDragEnd, listItems, onChange, value]);
-
-    void placeholder;
-    void upstreamSources;
+    }, [applyListItems, dragState, handleHandleDragEnd, listItems]);
 
     return (
         <div className={styles.notepadTemplateRow} data-id={id}>
@@ -236,8 +523,10 @@ const NotepadTemplateRow = ({
                         key={item.id}
                         item={item}
                         index={index}
+                        placeholder={placeholder}
                         renderListCell={renderListCell}
                         onDelete={handleDeleteItem}
+                        onTextChange={handleTextCellChange}
                         onHandleDragStart={handleHandleDragStart}
                         onHandleDragEnd={handleHandleDragEnd}
                         onCellDragOver={handleCellDragOver}
@@ -248,15 +537,46 @@ const NotepadTemplateRow = ({
                     />
                 ))}
 
-                <button
-                    type="button"
-                    className={styles.notepadTemplateAddButton}
-                    onClick={handleAddItem}
-                    aria-label="Add list item"
-                    title="Add list item"
-                >
-                    +
-                </button>
+                <div className={styles.notepadTemplateAddWrap} ref={addMenuRef}>
+                    <button
+                        type="button"
+                        className={styles.notepadTemplateAddButton}
+                        onClick={handleToggleAddMenu}
+                        aria-label="Add list item"
+                        title="Add list item"
+                    >
+                        +
+                    </button>
+
+                    {isAddMenuOpen ? (
+                        <div className={styles.notepadTemplateAddMenu} role="menu" aria-label="Add cell type">
+                            <button
+                                type="button"
+                                className={styles.notepadTemplateAddMenuItem}
+                                onClick={handleAddTextItem}
+                                role="menuitem"
+                            >
+                                Text input cell
+                            </button>
+
+                            {sourceOptions.map(source => (
+                                <button
+                                    key={`${source.sourceNodeId}:${source.sourcePortId}`}
+                                    type="button"
+                                    className={styles.notepadTemplateAddMenuItem}
+                                    onClick={() => handleAddSourceItem(source)}
+                                    role="menuitem"
+                                >
+                                    <span
+                                        className={styles.notepadTemplateAddMenuSwatch}
+                                        style={{backgroundColor: getSourceColor(source.sourceNodeType)}}
+                                    />
+                                    {source.label}
+                                </button>
+                            ))}
+                        </div>
+                    ) : null}
+                </div>
             </div>
         </div>
     );
