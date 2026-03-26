@@ -273,6 +273,37 @@ const reorderListItems = (items, dragId, overId, insertAfter) => {
     return nextItems;
 };
 
+const areListItemsEqual = (left, right) => {
+    if (left === right) return true;
+    if (!Array.isArray(left) || !Array.isArray(right)) return false;
+    if (left.length !== right.length) return false;
+
+    for (let i = 0; i < left.length; i += 1) {
+        const a = left[i];
+        const b = right[i];
+
+        if (!a || !b) return false;
+        if (a.id !== b.id || a.type !== b.type) return false;
+
+        if (a.type === 'placeholder') {
+            if (
+                String(a.sourceNodeId || '') !== String(b.sourceNodeId || '') ||
+                String(a.sourcePortId || 'out_value') !== String(b.sourcePortId || 'out_value') ||
+                String(a.label || '') !== String(b.label || '') ||
+                String(a.sourceNodeType || '') !== String(b.sourceNodeType || '') ||
+                (a.resolverField ? String(a.resolverField) : null) !==
+                    (b.resolverField ? String(b.resolverField) : null)
+            ) {
+                return false;
+            }
+        } else if (String(a.content || '') !== String(b.content || '')) {
+            return false;
+        }
+    }
+
+    return true;
+};
+
 const NotepadListCell = ({
     item,
     index,
@@ -336,10 +367,43 @@ const NotepadListCell = ({
         el.style.height = `${el.scrollHeight}px`;
     };
 
+    const handleCellDragStart = event => {
+        event.stopPropagation();
+
+        const dragHandleClass = styles.notepadTemplateDragHandle;
+        const target = event.target;
+        const fromDragHandle =
+            target && target.closest ? target.closest(`.${dragHandleClass}`) : null;
+
+        // Drag started from the explicit handle; let handle-level listener own it.
+        if (fromDragHandle) return;
+
+        const interactiveTarget =
+            target && target.closest
+                ? target.closest('textarea, input, select, option, button, a, [contenteditable="true"]')
+                : null;
+
+        if (interactiveTarget) {
+            event.preventDefault();
+            return;
+        }
+
+        onHandleDragStart(event, item.id);
+    };
+
+    const handleCellPointerDownCapture = event => {
+        event.stopPropagation();
+    };
+
     return (
         <div
             className={classNames.join(' ')}
             data-item-id={item.id}
+            draggable
+            onPointerDownCapture={handleCellPointerDownCapture}
+            onMouseDownCapture={handleCellPointerDownCapture}
+            onDragStart={handleCellDragStart}
+            onDragEnd={onHandleDragEnd}
             onDragOver={event => onCellDragOver(event, item.id)}
             onDrop={event => onCellDrop(event, item.id)}
         >
@@ -421,9 +485,13 @@ const NotepadTemplateRow = ({
         insertAfter: false
     });
     const addMenuRef = useRef(null);
+    const lastNormalizationMismatchRef = useRef(null);
 
     useEffect(() => {
-        setListItems(normalizeListItems(value));
+        const normalizedValueItems = normalizeListItems(value);
+        setListItems(prevItems => (
+            areListItemsEqual(prevItems, normalizedValueItems) ? prevItems : normalizedValueItems
+        ));
     }, [value]);
 
     const sourceOptions = useMemo(() => {
@@ -486,7 +554,18 @@ const NotepadTemplateRow = ({
         const expected = buildSegmentSignatureFromListItems(normalizedItems);
         const current = buildSegmentSignatureFromTemplate(value);
 
-        if (JSON.stringify(expected) === JSON.stringify(current)) return;
+        const expectedSerialized = JSON.stringify(expected);
+        const currentSerialized = JSON.stringify(current);
+
+        if (expectedSerialized === currentSerialized) {
+            lastNormalizationMismatchRef.current = null;
+            return;
+        }
+
+        const mismatchKey = `${expectedSerialized}::${currentSerialized}`;
+        if (lastNormalizationMismatchRef.current === mismatchKey) return;
+
+        lastNormalizationMismatchRef.current = mismatchKey;
         onChange(toNextTemplateValue(value, normalizedItems));
     }, [onChange, value]);
 
@@ -536,6 +615,7 @@ const NotepadTemplateRow = ({
     }, [applyListItems, listItems]);
 
     const handleHandleDragStart = useCallback((event, dragId) => {
+        event.stopPropagation();
         event.dataTransfer.effectAllowed = 'move';
         event.dataTransfer.setData('text/plain', dragId);
 
@@ -555,10 +635,13 @@ const NotepadTemplateRow = ({
     }, []);
 
     const handleCellDragOver = useCallback((event, overId) => {
-        if (!dragState.dragId || dragState.dragId === overId) return;
+        if (!dragState.dragId) return;
 
+        event.stopPropagation();
         event.preventDefault();
         event.dataTransfer.dropEffect = 'move';
+
+        if (dragState.dragId === overId) return;
 
         const rect = event.currentTarget.getBoundingClientRect();
         const insertAfter = event.clientY > rect.top + rect.height / 2;
@@ -574,7 +657,16 @@ const NotepadTemplateRow = ({
         });
     }, [dragState.dragId]);
 
+    const handleBoardDragOver = useCallback(event => {
+        if (!dragState.dragId) return;
+
+        event.stopPropagation();
+        event.preventDefault();
+        event.dataTransfer.dropEffect = 'move';
+    }, [dragState.dragId]);
+
     const handleCellDrop = useCallback((event, overId) => {
+        event.stopPropagation();
         event.preventDefault();
 
         const dragId = dragState.dragId || event.dataTransfer.getData('text/plain');
@@ -594,9 +686,45 @@ const NotepadTemplateRow = ({
         handleHandleDragEnd();
     }, [applyListItems, dragState, handleHandleDragEnd, listItems]);
 
+    const handleBoardDrop = useCallback(event => {
+        if (!dragState.dragId) return;
+
+        event.stopPropagation();
+        event.preventDefault();
+
+        const dragId = dragState.dragId || event.dataTransfer.getData('text/plain');
+        if (!dragId) {
+            handleHandleDragEnd();
+            return;
+        }
+
+        let nextItems = listItems;
+
+        if (dragState.overId) {
+            nextItems = reorderListItems(listItems, dragId, dragState.overId, dragState.insertAfter);
+        } else {
+            const fromIndex = listItems.findIndex(item => item.id === dragId);
+            if (fromIndex >= 0 && fromIndex < listItems.length - 1) {
+                nextItems = listItems.slice();
+                const [draggedItem] = nextItems.splice(fromIndex, 1);
+                nextItems.push(draggedItem);
+            }
+        }
+
+        if (nextItems !== listItems) {
+            applyListItems(nextItems);
+        }
+
+        handleHandleDragEnd();
+    }, [applyListItems, dragState, handleHandleDragEnd, listItems]);
+
     return (
         <div className={styles.notepadTemplateRow} data-id={id}>
-            <div className={styles.notepadTemplateBoard}>
+            <div
+                className={styles.notepadTemplateBoard}
+                onDragOver={handleBoardDragOver}
+                onDrop={handleBoardDrop}
+            >
                 {listItems.map((item, index) => (
                     <NotepadListCell
                         key={item.id}

@@ -667,7 +667,7 @@ $border-radius: 0.25rem;
 
 .notepadTemplateCellControls {
     position: absolute;
-    top: 0px;
+    top: -4px;
     left: -30px;
     display: inline-flex;
     flex-direction: column;
