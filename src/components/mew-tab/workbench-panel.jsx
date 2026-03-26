@@ -24,6 +24,8 @@ import {
     validateGraph
 } from './workbench/graphState';
 
+import {getConnectedUpstreamSourcesFromEdges} from './row-modules/utils/notepadTemplateValue';
+
 const PROJECT_STORAGE_KEY = 'mew.project.graph.v1';
 const STATUS_ROW_ID = 'state';
 
@@ -77,6 +79,21 @@ const WorkbenchPanel = ({
     const [layoutVersion, setLayoutVersion] = useState(0);
 
     const edges = useMemo(() => deriveEdges(graph.nodes), [graph.nodes]);
+
+    const notepadUpstreamSourcesByNodeId = useMemo(() => {
+        const result = {};
+        graph.nodes.forEach(node => {
+            if (node.type !== 'Notepad') return;
+            const promptValue = node?.data?.prompt?.value;
+            result[node.id] = getConnectedUpstreamSourcesFromEdges({
+                targetNodeId: node.id,
+                nodes: graph.nodes,
+                edges,
+                templateValue: promptValue
+            });
+        });
+        return result;
+    }, [graph.nodes, edges]);
 
     const [selectedNodeIds, setSelectedNodeIds] = useState([]);
     const [selectionBox, setSelectionBox] = useState(null);
@@ -672,27 +689,53 @@ const WorkbenchPanel = ({
 
     useLayoutEffect(() => {
         const wb = workbenchRef.current;
-        if (!wb) return;
+        if (!wb) return undefined;
 
-        const sync = () => {
-            setOverlaySize({
-                width: Math.max(wb.scrollWidth, wb.clientWidth, 1),
-                height: Math.max(wb.scrollHeight, wb.clientHeight, 1)
-            });
-            setLayoutVersion(v => v + 1); // force edge re-measure after layout
+        let rafId = null;
+        let lastWidth = -1;
+        let lastHeight = -1;
+
+        const measure = () => {
+            rafId = null;
+
+            const nextWidth = Math.max(wb.scrollWidth, wb.clientWidth, 1);
+            const nextHeight = Math.max(wb.scrollHeight, wb.clientHeight, 1);
+
+            setOverlaySize(prev => (
+                prev.width === nextWidth && prev.height === nextHeight
+                    ? prev
+                    : {width: nextWidth, height: nextHeight}
+            ));
+
+            if (nextWidth !== lastWidth || nextHeight !== lastHeight) {
+                lastWidth = nextWidth;
+                lastHeight = nextHeight;
+                setLayoutVersion(v => v + 1);
+            }
         };
 
-        sync();
+        const scheduleMeasure = () => {
+            if (rafId !== null) return;
+            rafId = requestAnimationFrame(measure);
+        };
 
-        const ro = new ResizeObserver(sync);
+        scheduleMeasure();
+
+        const ro = new ResizeObserver(() => {
+            scheduleMeasure();
+        });
         ro.observe(wb);
-        wb.addEventListener('scroll', sync, { passive: true });
-        window.addEventListener('resize', sync);
+
+        wb.addEventListener('scroll', scheduleMeasure, {passive: true});
+        window.addEventListener('resize', scheduleMeasure);
 
         return () => {
             ro.disconnect();
-            wb.removeEventListener('scroll', sync);
-            window.removeEventListener('resize', sync);
+            wb.removeEventListener('scroll', scheduleMeasure);
+            window.removeEventListener('resize', scheduleMeasure);
+            if (rafId !== null) {
+                cancelAnimationFrame(rafId);
+            }
         };
     }, []);
 
@@ -1105,7 +1148,26 @@ const WorkbenchPanel = ({
                 })()}
             </svg>
 
-            {graph.nodes.map(node => (
+            {graph.nodes.map(node => {
+                const promptValue = node?.data?.prompt?.value;
+
+                const baseModules = getNodeDefinition(node.type).rows;
+                const notepadUpstreamSources = notepadUpstreamSourcesByNodeId[node.id] || [];
+
+                const modulesForNode = node.type === 'Notepad'
+                    ? baseModules.map(row => {
+                        if (row.id !== 'prompt') return row;
+                        return {
+                            ...row,
+                            props: {
+                                ...(row.props || {}),
+                                upstreamSources: notepadUpstreamSources
+                            }
+                        };
+                    })
+                    : baseModules;
+
+                return (
                 <div
                     key={node.id}
                     data-workbench-node-id={node.id}
@@ -1126,16 +1188,17 @@ const WorkbenchPanel = ({
                         visibility: dragPreviews.some(p => p.nodeId === node.id) ? 'hidden' : 'visible'
                     }}
                 >
-                    <Node
-                        id={node.id}
-                        type={node.type}
-                        modules={getNodeDefinition(node.type).rows}
-                        data={node.data || {}}
-                        onModuleChange={handleNodeModuleChange}
-                        onPortPointerDown={handlePortPointerDown}
-                    />
+                <Node
+                    id={node.id}
+                    type={node.type}
+                    modules={modulesForNode}
+                    data={node.data || {}}
+                    onModuleChange={handleNodeModuleChange}
+                    onPortPointerDown={handlePortPointerDown}
+                />
                 </div>
-            ))}
+            );
+        })}
 
             {selectionBox && (() => {
                 const r = normalizeRect(selectionBox);

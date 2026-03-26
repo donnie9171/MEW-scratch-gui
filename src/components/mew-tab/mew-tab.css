@@ -488,3 +488,280 @@ $border-radius: 0.25rem;
     --node-bg: #ff1717;
     --node-fg: #fff;
 }
+
+
+.notepadTemplateRow {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding-top: 4px;
+    padding-bottom: 4px;
+}
+
+.notepadTemplateInput {
+    width: 100%;
+    min-height: 72px;
+    resize: vertical;
+    border: 1px solid rgba(255, 255, 255, 0.35);
+    border-radius: 6px;
+    padding: 6px 8px;
+    color: #1f2937;
+    background: #ffffff;
+    font-size: 12px;
+    line-height: 1.35;
+    box-sizing: border-box;
+}
+
+.notepadTemplateInput::placeholder {
+    color: #6b7280;
+}
+
+.notepadTemplateBoard {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.notepadTemplateListCell {
+    position: relative;
+    width: 100%;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    border-radius: 8px;
+    background: rgb(255, 255, 255);
+    color: black;
+    overflow: visible;
+}
+
+.notepadTemplateListCell::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: -28px;
+    width: 28px;
+}
+
+.notepadTemplateListCellDragging {
+    opacity: 0.6;
+}
+
+.notepadTemplateListCellBody {
+    min-height: 32px;
+    padding: 8px;
+}
+
+.notepadTemplateListCellDropBefore {
+    background: rgba(255, 255, 255, 0.8);
+    box-shadow: inset 0 4px 0 #ffab19;
+}
+
+.notepadTemplateListCellDropAfter {
+    background: rgba(255, 255, 255, 0.8);
+    box-shadow: inset 0 -4px 0 #ffab19;
+}
+
+.notepadTemplateCellControls {
+    position: absolute;
+    top: 0px;
+    left: -30px;
+    display: inline-flex;
+    flex-direction: column;
+    gap: 4px;
+    z-index: 2;
+    background-color: rgb(255, 255, 255);
+    border-radius: 8px;
+    padding: 2px;
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transition: opacity 120ms ease, visibility 120ms ease;
+}
+
+.notepadTemplateDragHandle {
+    width: 20px;
+    height: 20px;
+    border: 0;
+    border-radius: 6px;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    cursor: grab;
+}
+
+.notepadTemplateDragHandle:active {
+    cursor: grabbing;
+}
+
+.notepadTemplateDragHandle:hover {
+    background: rgba(0, 0, 0, 0.15);
+}
+
+.notepadTemplateDragHandleDots {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    grid-template-rows: repeat(3, 1fr);
+    gap: 2px;
+    width: 8px;
+    height: 10px;
+}
+
+.notepadTemplateDragHandleDot {
+    width: 2px;
+    height: 2px;
+    border-radius: 100%;
+    background: rgb(0, 0, 0);
+}
+
+.notepadTemplateDeleteButton {
+    width: 20px;
+    height: 20px;
+    border: 0;
+    border-radius: 6px;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    color: #000000;
+    font-size: 12px;
+    line-height: 1;
+    cursor: pointer;
+}
+
+.notepadTemplateListCell:hover .notepadTemplateCellControls,
+.notepadTemplateCellControls:hover {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+}
+
+.notepadTemplateDeleteButton:hover {
+    background: rgb(255, 128, 128);
+}
+
+.notepadTemplateAddButton {
+    width: 100%;
+    min-height: 34px;
+    border: 1px dashed rgba(255, 255, 255, 0.45);
+    border-radius: 8px;
+    background: transparent;
+    color: #ffffff;
+    font-size: 20px;
+    line-height: 1;
+    cursor: pointer;
+}
+
+.notepadTemplateAddButton:hover {
+    background: rgba(255, 255, 255, 0.12);
+}
+
+.notepadTokenList {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.notepadTokenChip {
+    display: inline-flex;
+    align-items: center;
+    border-radius: 999px;
+    padding: 2px 8px;
+    font-size: 11px;
+    line-height: 1.4;
+    color: #14532d;
+    background: #dcfce7;
+    border: 1px solid #86efac;
+}
+
+.notepadSourceTray {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 2px;
+}
+
+.notepadSourceChip {
+    border: 1px solid #93c5fd;
+    background: #dbeafe;
+    color: #1e3a8a;
+    border-radius: 999px;
+    padding: 2px 8px;
+    font-size: 11px;
+    line-height: 1.4;
+    cursor: pointer;
+}
+
+.notepadSourceChip:hover {
+    background: #bfdbfe;
+}
+
+.notepadTokenChip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    border-radius: 999px;
+    padding: 2px 8px;
+    font-size: 11px;
+    line-height: 1.4;
+    color: #14532d;
+    background: #dcfce7;
+    border: 1px solid #86efac;
+    cursor: grab;
+    user-select: none;
+}
+
+.notepadTokenChip:active {
+    cursor: grabbing;
+}
+
+.notepadTokenChipDragging {
+    opacity: 0.55;
+}
+
+.notepadTokenDropTarget {
+    outline: 2px dashed #16a34a;
+    outline-offset: 2px;
+}
+
+.notepadTokenRemove {
+    border: 0;
+    background: transparent;
+    color: #14532d;
+    font-size: 12px;
+    line-height: 1;
+    padding: 0;
+    cursor: pointer;
+}
+
+.notepadTemplateEditorWrap {
+    position: relative;
+    width: 100%;
+}
+
+.notepadTemplateEditor {
+    white-space: pre-wrap;
+    word-break: break-word;
+    overflow-y: auto;
+    cursor: text;
+}
+
+.notepadTemplateEditor:focus {
+    outline: 2px solid #93c5fd;
+    outline-offset: 1px;
+}
+
+.notepadTemplatePlaceholder {
+    position: absolute;
+    top: 7px;
+    left: 9px;
+    right: 9px;
+    color: #6b7280;
+    font-size: 12px;
+    line-height: 1.35;
+    pointer-events: none;
+    user-select: none;
+}

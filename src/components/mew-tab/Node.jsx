@@ -28,7 +28,7 @@ const toNodeTypeClass = type => {
     return `mew-node-type-${safe || 'unknown'}`;
 };
 
-const Node = ({ id, type, modules = [], data = {}, onModuleChange, onPortPointerDown }) => {
+const Node = ({ id, type, modules = [], data = {}, onModuleChange, onPortPointerDown, rowContextById = {} }) => {
     const handleModuleChange = (moduleId, newValue) => {
         if (onModuleChange) onModuleChange({nodeId: id, moduleId, newValue});
     };
@@ -46,6 +46,7 @@ const Node = ({ id, type, modules = [], data = {}, onModuleChange, onPortPointer
                 if (!RowComponent) return null;
 
                 const rowData = data[module.id] || {};
+                const rowContext = rowContextById[module.id] || {};
 
                 return (
                     <div key={module.id || index} className={styles.rowModule}>
@@ -58,6 +59,7 @@ const Node = ({ id, type, modules = [], data = {}, onModuleChange, onPortPointer
                         <RowComponent
                             id={module.id}
                             {...module.props}
+                            {...rowContext}
                             value={rowData.value}
                             onChange={(newValue) => handleModuleChange(module.id, newValue)}
                         />

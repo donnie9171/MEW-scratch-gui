@@ -8,13 +8,15 @@ import TitleRow from './TitleRow';
 import TextInputRow from './TextInputRow';
 import DropdownRow from './DropdownRow';
 import StatusRow from './StatusRow';
+import NotepadTemplateRow from './NotepadTemplateRow';
 
 
 const rowModuleRegistry = {
     title: TitleRow,
     textInput: TextInputRow,
     dropdown: DropdownRow,
-    status: StatusRow
+    status: StatusRow,
+    notepadTemplate: NotepadTemplateRow
 };
 
 /**

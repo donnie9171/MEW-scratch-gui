@@ -2,6 +2,19 @@ const SEQ_TOKEN_REGEX = /\{seq:(\d+)\}/;
 
 const pad = (n, width) => String(n).padStart(width, '0');
 
+const cloneLiteralValue = value => {
+    if (value === null || value === undefined) return value;
+    if (Array.isArray(value)) return value.map(cloneLiteralValue);
+    if (typeof value === 'object') {
+        const out = {};
+        Object.keys(value).forEach(key => {
+            out[key] = cloneLiteralValue(value[key]);
+        });
+        return out;
+    }
+    return value;
+};
+
 const getExistingValues = ({graph, nodeType, rowId, field = 'value', scope = 'nodeType'}) => {
     const values = new Set();
     const nodes = (graph?.nodes || []).filter(n => scope === 'global' || n.type === nodeType);
@@ -42,7 +55,7 @@ export const resolveNodeDefaults = ({nodeType, definition, graph}) => {
         if (!data[rowId]) data[rowId] = {};
 
         if (rule.type === 'literal') {
-            data[rowId][field] = rule.value;
+            data[rowId][field] = cloneLiteralValue(rule.value);
             continue;
         }
 

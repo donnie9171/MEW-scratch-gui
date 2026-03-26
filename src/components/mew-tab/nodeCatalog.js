@@ -20,6 +20,8 @@ import { FaGears } from "react-icons/fa6";
 import { LuAudioWaveform } from "react-icons/lu";
 import { FaNoteSticky } from "react-icons/fa6";
 
+import {createEmptyTemplateValue} from './row-modules/utils/notepadTemplateValue';
+
 
 
 
@@ -61,16 +63,18 @@ export const NODE_DEFINITIONS = {
 
     Notepad: {
         rows: [
-            { id: 'state', type: 'status', props: {label: "Notepad", icon: BiSolidNotepad},                 io: {
-                    input: {portId: 'in_value'},
-                    output: {portId: 'out_value'}
-                }},
-            {id: 'name', type: 'textInput', props: {label: 'Name', placeholder: 'Notepad name'}}
+            { id: 'state', type: 'status', props: {label: "Notepad", icon: BiSolidNotepad}, io: {
+                input: {portId: 'in_value'},
+                output: {portId: 'out_value'}
+            }},
+            {id: 'name', type: 'textInput', props: {label: 'Name', placeholder: 'Notepad name'}},
+            {id: 'prompt', type: 'notepadTemplate', props: {placeholder: 'Compose prompt with placeholders...'}}
         ],
         defaults: {
             scope: 'nodeType',
             rules: [
-                {rowId: 'name', field: 'value', type: 'template', template: 'Notepad {seq:3}'}
+                {rowId: 'name', field: 'value', type: 'template', template: 'Notepad {seq:3}'},
+                {rowId: 'prompt', field: 'value', type: 'literal', value: createEmptyTemplateValue()}
             ]
         }
     },
