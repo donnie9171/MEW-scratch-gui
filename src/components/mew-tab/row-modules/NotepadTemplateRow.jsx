@@ -154,6 +154,51 @@ const toNextTemplateValue = (currentValue, listItems) => {
     };
 };
 
+const buildSegmentSignatureFromListItems = listItems => {
+    const signature = [];
+
+    listItems.forEach((item, index) => {
+        if (item.type === 'placeholder' && item.sourceNodeId) {
+            signature.push({
+                type: 'token',
+                sourceNodeId: String(item.sourceNodeId || ''),
+                sourcePortId: String(item.sourcePortId || 'out_value'),
+                label: String(item.label || toSourceLabel(item)),
+                alias: '',
+                resolverField: item.resolverField ? String(item.resolverField) : null
+            });
+        } else {
+            signature.push({
+                type: 'text',
+                text: String(item.content || '')
+            });
+        }
+
+        if (index < listItems.length - 1) {
+            signature.push({type: 'text', text: '\n'});
+        }
+    });
+
+    return signature;
+};
+
+const buildSegmentSignatureFromTemplate = templateValue => (
+    normalizeTemplateValue(templateValue).segments.map(seg => {
+        if (seg.type === 'text') {
+            return {type: 'text', text: String(seg.text || '')};
+        }
+
+        return {
+            type: 'token',
+            sourceNodeId: String(seg.sourceNodeId || ''),
+            sourcePortId: String(seg.sourcePortId || 'out_value'),
+            label: String(seg.label || ''),
+            alias: String(seg.alias || ''),
+            resolverField: seg.resolverField ? String(seg.resolverField) : null
+        };
+    })
+);
+
 const syncPlaceholdersWithSources = (listItems, sourceOptions) => {
     const sourceByKey = new Map(
         sourceOptions.map(source => [
@@ -164,12 +209,20 @@ const syncPlaceholdersWithSources = (listItems, sourceOptions) => {
 
     let changed = false;
 
-    const nextItems = listItems.map(item => {
-        if (item.type !== 'placeholder') return item;
+    const nextItems = listItems.reduce((acc, item) => {
+        if (item.type !== 'placeholder') {
+            acc.push(item);
+            return acc;
+        }
 
         const key = `${item.sourceNodeId || ''}:${item.sourcePortId || 'out_value'}`;
         const latestSource = sourceByKey.get(key);
-        if (!latestSource) return item;
+
+        // If upstream source was deleted/disconnected, drop this placeholder to avoid stale refs.
+        if (!latestSource) {
+            changed = true;
+            return acc;
+        }
 
         const nextLabel = latestSource.label || item.label || 'Source';
         const nextSourceNodeType = latestSource.sourceNodeType || '';
@@ -180,17 +233,19 @@ const syncPlaceholdersWithSources = (listItems, sourceOptions) => {
             nextSourceNodeType === (item.sourceNodeType || '') &&
             nextResolverField === (item.resolverField || null)
         ) {
-            return item;
+            acc.push(item);
+            return acc;
         }
 
         changed = true;
-        return {
+        acc.push({
             ...item,
             label: nextLabel,
             sourceNodeType: nextSourceNodeType,
             resolverField: nextResolverField
-        };
-    });
+        });
+        return acc;
+    }, []);
 
     return changed ? nextItems : listItems;
 };
@@ -400,8 +455,20 @@ const NotepadTemplateRow = ({
             setIsAddMenuOpen(false);
         };
 
-        document.addEventListener('mousedown', handlePointerDown);
-        return () => document.removeEventListener('mousedown', handlePointerDown);
+        const handleKeyDown = event => {
+            if (event.key === 'Escape') {
+                setIsAddMenuOpen(false);
+            }
+        };
+
+        // Capture phase ensures we still close even if inner handlers stop propagation.
+        document.addEventListener('pointerdown', handlePointerDown, true);
+        document.addEventListener('keydown', handleKeyDown);
+
+        return () => {
+            document.removeEventListener('pointerdown', handlePointerDown, true);
+            document.removeEventListener('keydown', handleKeyDown);
+        };
     }, [isAddMenuOpen]);
 
     const applyListItems = useCallback(nextItems => {
@@ -409,6 +476,18 @@ const NotepadTemplateRow = ({
         if (onChange) {
             onChange(toNextTemplateValue(value, nextItems));
         }
+    }, [onChange, value]);
+
+    useEffect(() => {
+        if (!onChange) return;
+        if (!Array.isArray(value?.listItems)) return;
+
+        const normalizedItems = normalizeListItems(value);
+        const expected = buildSegmentSignatureFromListItems(normalizedItems);
+        const current = buildSegmentSignatureFromTemplate(value);
+
+        if (JSON.stringify(expected) === JSON.stringify(current)) return;
+        onChange(toNextTemplateValue(value, normalizedItems));
     }, [onChange, value]);
 
     useEffect(() => {
