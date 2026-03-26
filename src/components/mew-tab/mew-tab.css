@@ -479,6 +479,65 @@ $border-radius: 0.25rem;
     white-space: nowrap;
 }
 
+.statusBadgeWrapper {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+}
+
+.statusBadgeTooltip {
+    position: absolute;
+    bottom: calc(100% + 8px);
+    right: 0;
+    top: auto;
+    min-width: 180px;
+    min-height: 40px;
+    border-radius: 8px;
+    background: #ffffff;
+    border: 1px solid #9ca3af;
+    box-shadow: 0 10px 24px rgba(0, 0, 0, 0.24);
+    display: none;
+    z-index: 10;
+}
+
+.statusBadgeTooltipContent {
+    font-size: 12px;
+    line-height: 1.35;
+    color: #111827;
+    padding: 10px;
+    white-space: pre-wrap;
+    word-break: break-word;
+    font-weight: 500;
+}
+
+.statusBadgeTooltip::before {
+    content: "";
+    position: absolute;
+    bottom: -8px;
+    right: 14px;
+    border-left: 8px solid transparent;
+    border-right: 8px solid transparent;
+    border-top: 8px solid #9ca3af;
+}
+
+.statusBadgeTooltip::after {
+    content: "";
+    position: absolute;
+    bottom: -7px;
+    right: 15px;
+    border-left: 7px solid transparent;
+    border-right: 7px solid transparent;
+    border-top: 7px solid #ffffff;
+}
+
+.statusBadgeWrapper > .statusBadge:hover + .statusBadgeTooltip {
+    display: block;
+}
+
+.statusBadgeTooltipVisible {
+    display: block;
+}
+
 .statusQueued {
     color: #6b7280;
     background: #f3f4f6;

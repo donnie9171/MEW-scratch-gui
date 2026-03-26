@@ -8,6 +8,11 @@ import {createRunnerForNode} from './runnerRegistry';
 
 const buildNodeMap = nodes => new Map((nodes || []).map(n => [n.id, n]));
 
+const hasConnectedOutputs = node => {
+    const outputs = node?.outputs ? Object.values(node.outputs) : [];
+    return outputs.some(targets => (targets || []).some(target => Boolean(target?.nodeId)));
+};
+
 export const createRunManager = ({
     getGraph,
     applyNodeStatus,
@@ -52,6 +57,11 @@ export const createRunManager = ({
 
         try {
             await runner.run({triggeredBy: null});
+            const isLeafNode = !hasConnectedOutputs(node);
+            patchRuntime(node.id, {
+                outputsByPort: runtimeStore.getNodeState(node.id).outputsByPort || {},
+                tooltipAutoShowUntil: isLeafNode ? Date.now() + 5000 : undefined
+            });
             setStatus(node.id, 'complete');
             emit('nodeCompleted', {nodeId: node.id});
         } catch (error) {
@@ -127,6 +137,11 @@ export const createRunManager = ({
                     throw error;
                 }
 
+                const isLeafNode = !hasConnectedOutputs(node);
+                patchRuntime(node.id, {
+                    outputsByPort: runtimeStore.getNodeState(node.id).outputsByPort || {},
+                    tooltipAutoShowUntil: isLeafNode ? Date.now() + 5000 : undefined
+                });
                 setStatus(node.id, 'complete');
                 emit('nodeCompleted', {nodeId: node.id, clusterIndex});
 

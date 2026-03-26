@@ -40,10 +40,61 @@ const renderIcon = icon => {
     return null;
 };
 
-const StatusRow = ({label = 'Node name', value, status, icon, centerContent}) => {
+const getFirstOutputValue = outputsByPort => {
+    if (!outputsByPort || typeof outputsByPort !== 'object') return undefined;
+    if (Object.prototype.hasOwnProperty.call(outputsByPort, 'out_value')) {
+        return outputsByPort.out_value;
+    }
+
+    const firstPort = Object.keys(outputsByPort)[0];
+    return firstPort ? outputsByPort[firstPort] : undefined;
+};
+
+const stringifyRuntimeValue = runtimeValue => {
+    if (runtimeValue === undefined || runtimeValue === null || runtimeValue === '') return 'No output available.';
+    if (typeof runtimeValue === 'string') return runtimeValue;
+    if (typeof runtimeValue === 'number' || typeof runtimeValue === 'boolean') return String(runtimeValue);
+
+    try {
+        return JSON.stringify(runtimeValue, null, 2);
+    } catch {
+        return String(runtimeValue);
+    }
+};
+
+const getTooltipMessage = (statusKey, runtime = {}) => {
+    if (statusKey === 'queued') return 'This node will run after its inputs are done running.';
+    if (statusKey === 'running') return 'This node is currently running.';
+    if (statusKey === 'error') return stringifyRuntimeValue(runtime.error);
+
+    if (statusKey === 'complete') {
+        const output = getFirstOutputValue(runtime.outputsByPort);
+        return stringifyRuntimeValue(output);
+    }
+
+    return '';
+};
+
+const StatusRow = ({label = 'Node name', value, status, icon, centerContent, runtime}) => {
     const key = normalizeStatus(value ?? status);
     const meta = STATUS_META[key];
     const showBadge = key !== 'null';
+    const tooltipMessage = getTooltipMessage(key, runtime);
+    const [isAutoTooltipVisible, setIsAutoTooltipVisible] = React.useState(false);
+
+    React.useEffect(() => {
+        const autoShowUntil = Number(runtime?.tooltipAutoShowUntil || 0);
+        const msRemaining = autoShowUntil - Date.now();
+
+        if (key !== 'complete' || msRemaining <= 0) {
+            setIsAutoTooltipVisible(false);
+            return undefined;
+        }
+
+        setIsAutoTooltipVisible(true);
+        const timer = setTimeout(() => setIsAutoTooltipVisible(false), msRemaining);
+        return () => clearTimeout(timer);
+    }, [key, runtime?.tooltipAutoShowUntil]);
 
     return (
         <div className={styles.statusRow} data-row-type="status">
@@ -55,7 +106,16 @@ const StatusRow = ({label = 'Node name', value, status, icon, centerContent}) =>
                     <span className={styles.statusLabel}>{label}</span>
                 )}
             </div>
-            {showBadge ? <span className={`${styles.statusBadge} ${meta.className}`}>{meta.label}</span> : null}
+            {showBadge ? (
+                <div className={styles.statusBadgeWrapper}>
+                    <span className={`${styles.statusBadge} ${meta.className}`}>{meta.label}</span>
+                    <div
+                        className={`${styles.statusBadgeTooltip} ${isAutoTooltipVisible ? styles.statusBadgeTooltipVisible : ''}`}
+                    >
+                        <div className={styles.statusBadgeTooltipContent}>{tooltipMessage}</div>
+                    </div>
+                </div>
+            ) : null}
         </div>
     );
 };

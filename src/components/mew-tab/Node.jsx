@@ -49,6 +49,10 @@ const Node = ({ id, type, modules = [], data = {}, onModuleChange, onPortPointer
                 const rowContext = rowContextById[module.id] || {};
                 const moduleProps = {...(module.props || {})};
 
+                if (module.type === 'status') {
+                    moduleProps.runtime = data.__runtime || {};
+                }
+
                 if (module.type === 'status' && moduleProps.centerModule) {
                     const centerDefinition = moduleProps.centerModule;
                     const centerType = centerDefinition?.type;
