@@ -3,6 +3,7 @@ import {registerRunnerByType} from './runnerRegistry';
 import RunDebugPassthroughNode from './runners/RunDebugPassthroughNode';
 import RunAgentNode from './runners/RunAgentNode';
 import RunNotepadNode from './runners/RunNotepadNode';
+import RunVariableNode from './runners/RunVariableNode';
 
 let didRegisterDefaultRunners = false;
 
@@ -16,6 +17,7 @@ export const registerDefaultRunners = () => {
     // Override specific implemented runners.
     registerRunnerByType('Agent', RunAgentNode);
     registerRunnerByType('Notepad', RunNotepadNode);
+    registerRunnerByType('Variable', RunVariableNode);
 
     didRegisterDefaultRunners = true;
 };

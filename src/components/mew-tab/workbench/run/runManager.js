@@ -15,6 +15,7 @@ const hasConnectedOutputs = node => {
 
 export const createRunManager = ({
     getGraph,
+    getVm,
     applyNodeStatus,
     applyNodeRuntimePatch,
     onExecutionEvent
@@ -48,6 +49,7 @@ export const createRunManager = ({
             nodes,
             runtimeStore,
             graph,
+            vm: typeof getVm === 'function' ? getVm() : null,
             patchRuntime: (id, patch) => patchRuntime(id, patch)
         };
         const runner = createRunnerForNode(node, context);
@@ -117,6 +119,7 @@ export const createRunManager = ({
                     nodes,
                     runtimeStore,
                     graph,
+                    vm: typeof getVm === 'function' ? getVm() : null,
                     patchRuntime: (id, patch) => patchRuntime(id, patch)
                 });
 

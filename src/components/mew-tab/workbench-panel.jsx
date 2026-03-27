@@ -285,11 +285,17 @@ const WorkbenchPanel = ({
         graphRef.current = graph;
     }, [graph]);
 
+    const vmRef = useRef(vm);
+    useEffect(() => {
+        vmRef.current = vm;
+    }, [vm]);
+
     useEffect(() => {
         registerDefaultRunners();
 
         runManagerRef.current = createRunManager({
             getGraph: () => graphRef.current,
+            getVm: () => vmRef.current,
             applyNodeStatus: (nodeId, status) => {
                 suppressNextCheckpointRef.current = true;
                 setGraph(prev => ({
