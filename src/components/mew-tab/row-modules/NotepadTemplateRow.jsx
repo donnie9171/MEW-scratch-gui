@@ -763,7 +763,7 @@ const NotepadTemplateRow = ({
                                 onClick={handleAddTextItem}
                                 role="menuitem"
                             >
-                                Text input cell
+                                Add text
                             </button>
 
                             {sourceOptions.map(source => (

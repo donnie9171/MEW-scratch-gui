@@ -21,6 +21,7 @@ const DropdownRow = ({
     id,
     embedded = false,
     compact = false,
+    disabled = false,
 }) => {
     const computedDefault = defaultValue || (options[0]?.value ?? '');
     const [selected, setSelected] = useState(
@@ -30,6 +31,15 @@ const DropdownRow = ({
     useEffect(() => {
         if (typeof value === 'string') setSelected(value);
     }, [value]);
+
+    useEffect(() => {
+        if (typeof value === 'string') return;
+
+        const hasSelectedOption = options.some(opt => opt.value === selected);
+        if (!hasSelectedOption && selected !== computedDefault) {
+            setSelected(computedDefault);
+        }
+    }, [value, options, selected, computedDefault]);
 
     const handleChange = (e) => {
         const v = e.target.value;
@@ -54,6 +64,7 @@ const DropdownRow = ({
                 className={selectClassName}
                 value={selected}
                 onChange={handleChange}
+                disabled={disabled}
             >
                 {options.map((opt) => (
                     <option key={opt.value} value={opt.value}>

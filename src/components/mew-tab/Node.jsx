@@ -62,11 +62,13 @@ const Node = ({ id, type, modules = [], data = {}, onModuleChange, onPortPointer
                         const centerRowId = centerDefinition?.rowId || module.id;
                         const centerRowData = data[centerRowId] || {};
                         const centerProps = centerDefinition?.props || {};
+                        const centerRowContext = rowContextById[centerRowId] || {};
 
                         moduleProps.centerContent = (
                             <CenterRowComponent
                                 id={centerRowId}
                                 {...centerProps}
+                                {...centerRowContext}
                                 value={centerRowData.value}
                                 onChange={(newValue) => handleModuleChange(centerRowId, newValue)}
                                 embedded

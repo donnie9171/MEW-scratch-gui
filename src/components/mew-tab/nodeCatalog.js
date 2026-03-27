@@ -36,7 +36,7 @@ export const NODE_DEFINITIONS = {
                     centerModule: {
                         type: 'textInput',
                         rowId: 'name',
-                        props: {placeholder: 'Agent name'}
+                        props: {placeholder: 'Agent'}
                     }
                 },                 io: {
                     input: {portId: 'in_value'},
@@ -72,7 +72,7 @@ export const NODE_DEFINITIONS = {
                 centerModule: {
                     type: 'textInput',
                     rowId: 'name',
-                    props: {placeholder: 'Notepad name'}
+                    props: {placeholder: 'Notepad'}
                 }
             }, io: {
                 input: {portId: 'in_value'},
@@ -99,9 +99,10 @@ export const NODE_DEFINITIONS = {
                         rowId: 'variableName',
                         props: {
                             options: [
-                                {value: 'myvariable', label: 'myvariable'}
+                                {value: '', label: 'Variable'}
                             ],
-                            defaultValue: 'myvariable'
+                            defaultValue: '',
+                            disabled: true
                         }
                     }
                 }, io: {

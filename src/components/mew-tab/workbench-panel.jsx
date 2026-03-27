@@ -25,9 +25,19 @@ import {
 } from './workbench/graphState';
 
 import {getConnectedUpstreamSourcesFromEdges} from './row-modules/utils/notepadTemplateValue';
+import {getScratchVariableAndListNames} from './helper/scratchVm';
 
 const PROJECT_STORAGE_KEY = 'mew.project.graph.v1';
 const STATUS_ROW_ID = 'state';
+const VM_POLL_INTERVAL_MS = 1000;
+
+const areStringArraysEqual = (a = [], b = []) => {
+    if (a.length !== b.length) return false;
+    for (let i = 0; i < a.length; i += 1) {
+        if (a[i] !== b[i]) return false;
+    }
+    return true;
+};
 
 const loadInitialGraph = () => {
     if (typeof window === 'undefined') return createEmptyGraph();
@@ -57,7 +67,8 @@ const WorkbenchPanel = ({
     undoMewGraph: dispatchUndoMewGraph,
     checkpointMewGraph: dispatchCheckpointMewGraph,
     mewGraph,
-    isMewTabActive
+    isMewTabActive,
+    vm
  }) => {
     const [graph, setGraph] = useState(() => mewGraph || loadLocalGraph() || createEmptyGraph());
     const graphRef = useRef(graph);
@@ -77,6 +88,13 @@ const WorkbenchPanel = ({
 
     const [overlaySize, setOverlaySize] = useState({ width: 1, height: 1 });
     const [layoutVersion, setLayoutVersion] = useState(0);
+    const [scratchVariableNames, setScratchVariableNames] = useState([]);
+
+    const scratchVariableDropdownOptions = useMemo(() => (
+        scratchVariableNames.length > 0
+            ? scratchVariableNames.map(name => ({value: name, label: name}))
+            : [{value: '', label: '(no variables or lists found)'}]
+    ), [scratchVariableNames]);
 
     const edges = useMemo(() => deriveEdges(graph.nodes), [graph.nodes]);
 
@@ -318,6 +336,69 @@ const WorkbenchPanel = ({
             getGraph: () => graphRef.current
         };
     }, [handleRunSelected, graph]);
+
+    useEffect(() => {
+        let canceled = false;
+
+        const syncScratchVariables = () => {
+            const names = getScratchVariableAndListNames(vm);
+
+            setScratchVariableNames(prev => (
+                areStringArraysEqual(prev, names) ? prev : names
+            ));
+        };
+
+        syncScratchVariables();
+        const intervalId = window.setInterval(() => {
+            if (canceled) return;
+            syncScratchVariables();
+        }, VM_POLL_INTERVAL_MS);
+
+        return () => {
+            canceled = true;
+            window.clearInterval(intervalId);
+        };
+    }, [vm]);
+
+    useEffect(() => {
+        const availableNames = new Set(scratchVariableNames);
+        const fallbackValue = scratchVariableNames[0] || '';
+
+        setGraph(prev => {
+            let didChange = false;
+
+            const nextNodes = prev.nodes.map(node => {
+                if (node.type !== 'Variable') return node;
+
+                const currentValue = node?.data?.variableName?.value;
+                const nextValue = (typeof currentValue === 'string' && availableNames.has(currentValue))
+                    ? currentValue
+                    : fallbackValue;
+
+                if (nextValue === currentValue) return node;
+
+                didChange = true;
+                return {
+                    ...node,
+                    data: {
+                        ...(node.data || {}),
+                        variableName: {
+                            ...((node.data && node.data.variableName) || {}),
+                            value: nextValue
+                        }
+                    }
+                };
+            });
+
+            if (!didChange) return prev;
+
+            return {
+                ...prev,
+                nodes: nextNodes,
+                meta: { ...prev.meta, updatedAt: new Date().toISOString() }
+            };
+        });
+    }, [scratchVariableNames]);
 
 
     const idCounterRef = useRef(0);
@@ -1167,6 +1248,16 @@ const WorkbenchPanel = ({
                     })
                     : baseModules;
 
+                const variableRowContextById = node.type === 'Variable'
+                    ? {
+                        variableName: {
+                            options: scratchVariableDropdownOptions,
+                            defaultValue: scratchVariableDropdownOptions[0]?.value || '',
+                            disabled: scratchVariableNames.length === 0
+                        }
+                    }
+                    : {};
+
                 return (
                 <div
                     key={node.id}
@@ -1195,6 +1286,7 @@ const WorkbenchPanel = ({
                     data={node.data || {}}
                     onModuleChange={handleNodeModuleChange}
                     onPortPointerDown={handlePortPointerDown}
+                    rowContextById={variableRowContextById}
                 />
                 </div>
             );
@@ -1291,6 +1383,13 @@ const WorkbenchPanel = ({
                                 data={(graph.nodes.find(n => n.id === preview.nodeId)?.data) || {}}
                                 onModuleChange={() => {}}
                                 onPortPointerDown={() => {}}
+                                rowContextById={preview.nodeType === 'Variable' ? {
+                                    variableName: {
+                                        options: scratchVariableDropdownOptions,
+                                        defaultValue: scratchVariableDropdownOptions[0]?.value || '',
+                                        disabled: scratchVariableNames.length === 0
+                                    }
+                                } : {}}
                             />
                         </div>
                     ))}
@@ -1303,7 +1402,8 @@ const WorkbenchPanel = ({
 
 const mapStateToProps = state => ({
     mewGraph: getMewGraph(state),
-    isMewTabActive: getActiveTabIndex(state) === MEW_TAB_INDEX
+    isMewTabActive: getActiveTabIndex(state) === MEW_TAB_INDEX,
+    vm: state.scratchGui.vm
 });
 
 const mapDispatchToProps = {
