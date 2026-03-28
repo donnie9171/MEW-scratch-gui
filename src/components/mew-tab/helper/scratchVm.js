@@ -97,3 +97,34 @@ export const setScratchVariableValue = (vm, variableName, nextValue) => {
     ref.variable.value = nextValue;
     return true;
 };
+
+
+const isBroadcastMessageType = type => type === 'broadcast_msg';
+
+export const getScratchBroadcastNames = vm => {
+    const runtime = getScratchRuntime(vm);
+    if (!runtime || !Array.isArray(runtime.targets)) return [];
+
+    const names = [];
+
+    try {
+        for (const target of runtime.targets) {
+            const variables = target?.variables;
+            if (!variables || typeof variables !== 'object') continue;
+
+            for (const variable of Object.values(variables)) {
+                const name = getVariableName(variable);
+                const type = getVariableType(variable);
+
+                if (!name) continue;
+                if (isBroadcastMessageType(type)) {
+                    names.push(name);
+                }
+            }
+        }
+    } catch {
+        return [];
+    }
+
+    return Array.from(new Set(names));
+};

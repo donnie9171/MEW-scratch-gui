@@ -114,15 +114,41 @@ export const NODE_DEFINITIONS = {
 
     Receiver: {
         rows: [
-            { id: 'state', type: 'status', props: {label: "Receiver", icon: RiRadarFill}},
-            {id: 'title', type: 'title', props: {text: 'Receiver'}}
+            { id: 'state', type: 'status', props: {label: "When I receive", icon: RiRadarFill}, io:{
+                output: {portId: 'trigger'}
+            }},
+            {
+                id: 'message',
+                type: 'dropdown',
+                props: {
+                    label: 'message',
+                    options: [
+                        {value: '', label: 'Message'}
+                    ],
+                    defaultValue: ''
+                },
+                io: {}
+            }
         ]
     },
 
     Broadcaster: {
         rows: [
-            { id: 'state', type: 'status', props: {label: "Broadcaster", icon: TbBuildingBroadcastTowerFilled}},
-            {id: 'title', type: 'title', props: {text: 'Broadcaster'}}
+            { id: 'state', type: 'status', props: {label: "Broadcast", icon: TbBuildingBroadcastTowerFilled}, io:{
+                input: {portId: 'trigger'}
+            }},
+            {
+                id: 'message',
+                type: 'dropdown',
+                props: {
+                    label: 'message',
+                    options: [
+                        {value: '', label: 'Message'}
+                    ],
+                    defaultValue: ''
+                },
+                io: {}
+            }
         ]
     },
 

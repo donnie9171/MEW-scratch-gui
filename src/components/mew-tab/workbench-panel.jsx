@@ -25,7 +25,7 @@ import {
 } from './workbench/graphState';
 
 import {getConnectedUpstreamSourcesFromEdges} from './row-modules/utils/notepadTemplateValue';
-import {getScratchVariableAndListNames} from './helper/scratchVm';
+import {getScratchVariableAndListNames, getScratchBroadcastNames} from './helper/scratchVm';
 
 const PROJECT_STORAGE_KEY = 'mew.project.graph.v1';
 const STATUS_ROW_ID = 'state';
@@ -95,6 +95,14 @@ const WorkbenchPanel = ({
             ? scratchVariableNames.map(name => ({value: name, label: name}))
             : [{value: '', label: '(no variables or lists found)'}]
     ), [scratchVariableNames]);
+
+    const [scratchBroadcastNames, setScratchBroadcastNames] = useState([]);
+
+    const scratchBroadcastDropdownOptions = useMemo(() => (
+        scratchBroadcastNames.length > 0
+            ? scratchBroadcastNames.map(name => ({value: name, label: name}))
+            : [{value: '', label: '(no broadcast messages found)'}]
+    ), [scratchBroadcastNames]);
 
     const edges = useMemo(() => deriveEdges(graph.nodes), [graph.nodes]);
 
@@ -354,10 +362,21 @@ const WorkbenchPanel = ({
             ));
         };
 
+        const syncScratchBroadcasts = () => {
+            const names = getScratchBroadcastNames(vm);
+
+            setScratchBroadcastNames(prev => (
+                areStringArraysEqual(prev, names) ? prev : names
+            ));
+        };
+
         syncScratchVariables();
+        syncScratchBroadcasts();
+
         const intervalId = window.setInterval(() => {
             if (canceled) return;
             syncScratchVariables();
+            syncScratchBroadcasts();
         }, VM_POLL_INTERVAL_MS);
 
         return () => {
@@ -405,6 +424,70 @@ const WorkbenchPanel = ({
             };
         });
     }, [scratchVariableNames]);
+
+    useEffect(() => {
+        const availableNames = new Set(scratchBroadcastNames);
+        const fallbackValue = scratchBroadcastNames[0] || '';
+
+        setGraph(prev => {
+            let didChange = false;
+
+            const nextNodes = prev.nodes.map(node => {
+                if (node.type !== 'Receiver' && node.type !== 'Broadcaster') return node;
+
+                const currentValue = node?.data?.message?.value;
+                const nextValue = (typeof currentValue === 'string' && availableNames.has(currentValue))
+                    ? currentValue
+                    : fallbackValue;
+
+                if (nextValue === currentValue) return node;
+
+                didChange = true;
+                return {
+                    ...node,
+                    data: {
+                        ...(node.data || {}),
+                        message: {
+                            ...((node.data && node.data.message) || {}),
+                            value: nextValue
+                        }
+                    }
+                };
+            });
+
+            if (!didChange) return prev;
+
+            return {
+                ...prev,
+                nodes: nextNodes,
+                meta: { ...prev.meta, updatedAt: new Date().toISOString() }
+            };
+        });
+    }, [scratchBroadcastNames]);
+
+    const getRowContextByNodeType = nodeType => {
+        if (nodeType === 'Variable') {
+            return {
+                variableName: {
+                    options: scratchVariableDropdownOptions,
+                    defaultValue: scratchVariableDropdownOptions[0]?.value || '',
+                    disabled: scratchVariableNames.length === 0
+                }
+            };
+        }
+
+        if (nodeType === 'Receiver' || nodeType === 'Broadcaster') {
+            return {
+                message: {
+                    options: scratchBroadcastDropdownOptions,
+                    defaultValue: scratchBroadcastDropdownOptions[0]?.value || '',
+                    disabled: scratchBroadcastNames.length === 0
+                }
+            };
+        }
+
+        return {};
+    };
 
 
     const idCounterRef = useRef(0);
@@ -1254,15 +1337,7 @@ const WorkbenchPanel = ({
                     })
                     : baseModules;
 
-                const variableRowContextById = node.type === 'Variable'
-                    ? {
-                        variableName: {
-                            options: scratchVariableDropdownOptions,
-                            defaultValue: scratchVariableDropdownOptions[0]?.value || '',
-                            disabled: scratchVariableNames.length === 0
-                        }
-                    }
-                    : {};
+                const rowContextById = getRowContextByNodeType(node.type);
 
                 return (
                 <div
@@ -1292,7 +1367,7 @@ const WorkbenchPanel = ({
                     data={node.data || {}}
                     onModuleChange={handleNodeModuleChange}
                     onPortPointerDown={handlePortPointerDown}
-                    rowContextById={variableRowContextById}
+                    rowContextById={rowContextById}
                 />
                 </div>
             );
@@ -1389,13 +1464,7 @@ const WorkbenchPanel = ({
                                 data={(graph.nodes.find(n => n.id === preview.nodeId)?.data) || {}}
                                 onModuleChange={() => {}}
                                 onPortPointerDown={() => {}}
-                                rowContextById={preview.nodeType === 'Variable' ? {
-                                    variableName: {
-                                        options: scratchVariableDropdownOptions,
-                                        defaultValue: scratchVariableDropdownOptions[0]?.value || '',
-                                        disabled: scratchVariableNames.length === 0
-                                    }
-                                } : {}}
+                                rowContextById={getRowContextByNodeType(preview.nodeType)}
                             />
                         </div>
                     ))}
