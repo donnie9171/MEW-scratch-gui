@@ -1434,6 +1434,17 @@ const WorkbenchPanel = ({
                 graph: prev,
             });
 
+            if (nodeType === "Variable") {
+                const fallbackVariable = scratchVariableNames[0] || "";
+                initialData.variableName = {
+                    ...(initialData.variableName || {}),
+                    value:
+                        typeof initialData?.variableName?.value === "string"
+                            ? initialData.variableName.value
+                            : fallbackVariable,
+                };
+            }
+
             const newNode = {
                 id: `${nodeType}-${Date.now()}`,
                 type: nodeType,
