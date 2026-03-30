@@ -18,7 +18,6 @@ import { TiMicrophone } from "react-icons/ti";
 import { FaIdCardAlt } from "react-icons/fa";
 import { FaGears } from "react-icons/fa6";
 import { LuAudioWaveform } from "react-icons/lu";
-import { FaNoteSticky } from "react-icons/fa6";
 
 import {createEmptyTemplateValue} from './row-modules/utils/notepadTemplateValue';
 
@@ -152,16 +151,19 @@ export const NODE_DEFINITIONS = {
         ]
     },
 
-    Comment: {
-        rows: [
-            { id: 'state', type: 'status', props: {label: "Comment", icon: FaNoteSticky}}
-        ]
-    },
-
     Microphone: {
         rows: [
-            { id: 'state', type: 'status', props: {label: "Microphone", icon: TiMicrophone}},
-            {id: 'name', type: 'textInput', props: {label: 'Name', placeholder: 'Microphone name'}}
+            { id: 'state', type: 'status', props: {label: "Microphone", icon: TiMicrophone,             
+                centerModule: {
+                    type: 'textInput',
+                    rowId: 'name',
+                    props: {placeholder: 'Microphone'}
+                }}, 
+            io:{
+                input: {portId: 'trigger'},
+                output: {portId: 'transcript'}
+            }},
+            {id: 'language', type: 'dropdown', props: {label: 'Language', options: [{value: 'en', label: 'English'}], defaultValue: 'en'}}
         ],
         defaults: {
             scope: 'nodeType',

@@ -4,6 +4,7 @@ import styles from '../mew-tab.css';
 const STATUS_META = {
     queued: {label: 'Queued', className: styles.statusQueued},
     running: {label: 'Running', className: styles.statusRunning},
+    listening: {label: 'Listening', className: styles.statusListening},
     error: {label: 'Error', className: styles.statusError},
     complete: {label: 'Complete', className: styles.statusComplete},
     null: {label: 'Not in Cluster', className: styles.statusNull}
@@ -63,8 +64,13 @@ const stringifyRuntimeValue = runtimeValue => {
 };
 
 const getTooltipMessage = (statusKey, runtime = {}) => {
+    if (typeof runtime?.tooltipMessage === 'string' && runtime.tooltipMessage.trim()) {
+        return runtime.tooltipMessage;
+    }
+
     if (statusKey === 'queued') return 'This node will run after its inputs are done running.';
     if (statusKey === 'running') return 'This node is currently running.';
+    if (statusKey === 'listening') return 'Listening...';
     if (statusKey === 'error') return stringifyRuntimeValue(runtime.error);
 
     if (statusKey === 'complete') {
@@ -76,13 +82,20 @@ const getTooltipMessage = (statusKey, runtime = {}) => {
 };
 
 const StatusRow = ({label = 'Node name', value, status, icon, centerContent, runtime}) => {
-    const key = normalizeStatus(value ?? status);
+    const key = normalizeStatus(runtime?.customStatus ?? value ?? status);
     const meta = STATUS_META[key];
     const showBadge = key !== 'null';
     const tooltipMessage = getTooltipMessage(key, runtime);
     const [isAutoTooltipVisible, setIsAutoTooltipVisible] = React.useState(false);
 
     React.useEffect(() => {
+        const forceVisible = Boolean(runtime?.tooltipForceVisible);
+
+        if (forceVisible) {
+            setIsAutoTooltipVisible(true);
+            return undefined;
+        }
+
         const autoShowUntil = Number(runtime?.tooltipAutoShowUntil || 0);
         const msRemaining = autoShowUntil - Date.now();
 
@@ -94,7 +107,7 @@ const StatusRow = ({label = 'Node name', value, status, icon, centerContent, run
         setIsAutoTooltipVisible(true);
         const timer = setTimeout(() => setIsAutoTooltipVisible(false), msRemaining);
         return () => clearTimeout(timer);
-    }, [key, runtime?.tooltipAutoShowUntil]);
+    }, [key, runtime?.tooltipAutoShowUntil, runtime?.tooltipForceVisible]);
 
     return (
         <div className={styles.statusRow} data-row-type="status">

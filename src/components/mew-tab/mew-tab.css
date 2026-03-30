@@ -562,6 +562,12 @@ $border-radius: 0.25rem;
     border-color: #86efac;
 }
 
+.statusListening {
+    color: #991b1b;
+    background: #fee2e2;
+    border-color: #f87171;
+}
+
 /* Node-type colors */
 :global(.mew-node-type-receiver),
 :global(.mew-node-type-broadcaster) {
