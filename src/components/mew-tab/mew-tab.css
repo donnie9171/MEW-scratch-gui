@@ -37,9 +37,7 @@ $border-radius: 0.25rem;
 }
 
 .toolbox {
-    width: 250px;
-    min-width: 180px;
-    max-width: 320px;
+    width: 240px;
     background: $mew-background;
     overflow-y: scroll;
     max-height: 100%;
@@ -328,6 +326,9 @@ $border-radius: 0.25rem;
     background: var(--node-bg, #2499ff);
     color: var(--node-fg, #fff);
     border: 1px solid #444;
+    width: 200px;
+    min-width: 200px;
+    max-width: 200px;
 }
 
 .toolboxItem {
@@ -352,6 +353,9 @@ $border-radius: 0.25rem;
     width: auto;
     max-width: none;
     box-sizing: border-box;
+    width: 200px;
+    min-width: 200px;
+    max-width: 200px;
 }
 
 .toolboxItem .rowModule {
@@ -470,25 +474,65 @@ $border-radius: 0.25rem;
 }
 
 .statusBadge {
+    width: 22px;
+    height: 22px;
     border-radius: 999px;
-    padding: 2px 8px;
-    font-size: 11px;
-    font-weight: 600;
-    line-height: 1.4;
-    border: 1px solid transparent;
-    white-space: nowrap;
+    padding: 0;
+    font-size: 0;
+    line-height: 1;
+    border: 2px solid #ffffff;
+    color: #ffffff;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    box-sizing: border-box;
+    flex: 0 0 22px;
 }
 
 .statusBadgeWrapper {
     position: relative;
     display: inline-flex;
     align-items: center;
+    justify-content: center;
+    width: 22px;
+    min-width: 22px;
+    flex: 0 0 22px;
 }
+
+.statusBadgePlaceholder {
+    width: 22px;
+    height: 22px;
+    display: inline-block;
+    visibility: hidden;
+}
+
+.statusBadgeIcon {
+    width: 12px;
+    height: 12px;
+    display: block;
+}
+
+.statusBadgeIconSpin {
+    animation: statusBadgeSpin 0.9s linear infinite;
+    transform-origin: center;
+}
+
+@keyframes statusBadgeSpin {
+    from {
+        transform: rotate(0deg);
+    }
+
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+
 
 .statusBadgeTooltip {
     position: absolute;
     bottom: calc(100% + 8px);
-    right: 0;
+    right: -10px;
     top: auto;
     min-width: 180px;
     min-height: 40px;
@@ -514,7 +558,7 @@ $border-radius: 0.25rem;
     content: "";
     position: absolute;
     bottom: -8px;
-    right: 14px;
+    right: 12px;
     border-left: 8px solid transparent;
     border-right: 8px solid transparent;
     border-top: 8px solid #9ca3af;
@@ -524,7 +568,7 @@ $border-radius: 0.25rem;
     content: "";
     position: absolute;
     bottom: -7px;
-    right: 15px;
+    right: 13px;
     border-left: 7px solid transparent;
     border-right: 7px solid transparent;
     border-top: 7px solid #ffffff;
@@ -539,33 +583,23 @@ $border-radius: 0.25rem;
 }
 
 .statusQueued {
-    color: #6b7280;
-    background: #f3f4f6;
-    border-color: #e5e7eb;
+    background: #6b7280;
 }
 
 .statusRunning {
-    color: #1d4ed8;
-    background: #dbeafe;
-    border-color: #93c5fd;
+    background-color: #2499ff;
 }
 
 .statusError {
-    color: #991b1b;
-    background: #fee2e2;
-    border-color: #fca5a5;
+    background-color: #991b1b;
 }
 
 .statusComplete {
-    color: #166534;
-    background: #dcfce7;
-    border-color: #86efac;
+    background-color: #5ac05b;
 }
 
 .statusListening {
-    color: #991b1b;
-    background: #fee2e2;
-    border-color: #f87171;
+    background-color: #c70f0f;
 }
 
 /* Node-type colors */
