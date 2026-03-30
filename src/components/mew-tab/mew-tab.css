@@ -358,6 +358,11 @@ $border-radius: 0.25rem;
     max-width: 200px;
 }
 
+.toolboxItem .node,
+.toolboxItem .node * {
+    pointer-events: none;
+}
+
 .toolboxItem .rowModule {
     min-height: 28px;           /* keep row height aligned with workbench */
 }
