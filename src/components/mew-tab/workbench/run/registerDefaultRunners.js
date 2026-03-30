@@ -4,6 +4,8 @@ import RunDebugPassthroughNode from './runners/RunDebugPassthroughNode';
 import RunAgentNode from './runners/RunAgentNode';
 import RunNotepadNode from './runners/RunNotepadNode';
 import RunVariableNode from './runners/RunVariableNode';
+import RunReceiverNode from './runners/RunReceiverNode';
+import RunBroadcasterNode from './runners/RunBroadcasterNode';
 
 let didRegisterDefaultRunners = false;
 
@@ -18,6 +20,7 @@ export const registerDefaultRunners = () => {
     registerRunnerByType('Agent', RunAgentNode);
     registerRunnerByType('Notepad', RunNotepadNode);
     registerRunnerByType('Variable', RunVariableNode);
-
+    registerRunnerByType('Receiver', RunReceiverNode);
+    registerRunnerByType('Broadcaster', RunBroadcasterNode);
     didRegisterDefaultRunners = true;
 };
