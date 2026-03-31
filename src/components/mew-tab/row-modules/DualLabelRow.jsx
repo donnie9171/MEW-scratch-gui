@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { MdOutlineSwapHoriz } from 'react-icons/md';
 import styles from '../mew-tab.css';
 
 const DualLabelRow = ({
@@ -10,7 +11,8 @@ const DualLabelRow = ({
     value,
     onChange,
     id,
-    disabled = false
+    disabled = false,
+    showSwapButton = true
 }) => {
     const getLeft = (v) =>
         v && typeof v === 'object' && typeof v.left === 'string' ? v.left : leftLabel;
@@ -35,6 +37,15 @@ const DualLabelRow = ({
         if (onChange) onChange(next);
     };
 
+    const handleSwap = () => {
+        const swapped = {
+            left: draft.right,
+            right: draft.left
+        };
+        setDraft(swapped);
+        if (onChange) onChange(swapped);
+    };
+
     if (!editable) {
         return (
             <div className={styles.dualLabelRow} data-id={id}>
@@ -54,6 +65,17 @@ const DualLabelRow = ({
                 onChange={e => update({ left: e.target.value })}
                 disabled={disabled}
             />
+            {showSwapButton && (
+                <button
+                    className={styles.swapButton}
+                    onClick={handleSwap}
+                    disabled={disabled}
+                    type='button'
+                    aria-label='Swap left and right values'
+                >
+                    <MdOutlineSwapHoriz />
+                </button>
+            )}
             <input
                 type='text'
                 className={`${styles.dualLabelInput} ${styles.dualLabelInputRight}`}

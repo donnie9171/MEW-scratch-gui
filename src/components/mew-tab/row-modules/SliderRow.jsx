@@ -39,6 +39,8 @@ const SliderRow = ({
 
     const [sliderValue, setSliderValue] = useState(initial);
     const [tooltipsVisible, setTooltipsVisible] = useState(false);
+    const [isHovering, setIsHovering] = useState(false);
+    const shouldShowTooltips = showTooltips && (tooltipsVisible || isHovering);
     const hideTimerRef = useRef(null);
     const mountedRef = useRef(false);
 
@@ -98,8 +100,13 @@ const SliderRow = ({
     };
 
     return (
-        <div className={styles.sliderRow} data-id={id}>
-            {tooltipsVisible && (
+        <div
+            className={styles.sliderRow}
+            data-id={id}
+            onMouseEnter={() => setIsHovering(true)}
+            onMouseLeave={() => setIsHovering(false)}
+        >
+            {shouldShowTooltips && (
                 <div
                     className={`${styles.sliderTooltip} ${styles.sliderTooltipTop}`}
                     style={{ left: percentFromNormalized(effectiveNormalized) }}
@@ -119,7 +126,7 @@ const SliderRow = ({
                 disabled={disabled || hasControlledValue}
             />
 
-            {tooltipsVisible && (
+            {shouldShowTooltips && (
                 <div
                     className={`${styles.sliderTooltip} ${styles.sliderTooltipBottom}`}
                     style={{ left: percentFromNormalized(effectiveNormalized) }}
