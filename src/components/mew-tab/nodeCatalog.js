@@ -184,7 +184,52 @@ export const NODE_DEFINITIONS = {
         rows: [
             { id: 'state', type: 'status', props: {label: "Servo", icon: FaGears}},
             {id: 'servoId', type: 'textInput', props: {label: 'Servo ID', placeholder: 'servo pin number'}},
-        ]
+            {
+            id: 'normalizedLabel',
+            type: 'dualLabel',
+            props: {
+                leftLabel: '0',
+                rightLabel: '1',
+                editable: false,
+            },
+            io:{
+                input: {portId: 'normalized_value'}
+            }
+        },
+        {
+            id: 'servoValue',
+            type: 'slider',
+            props: {
+                min: 0,
+                max: 1,
+                step: 0.01,
+                defaultValue: 0.5
+            }
+        },
+        {
+            id: 'servoRange',
+            type: 'dualLabel',
+            props: {
+                leftLabel: '0',
+                rightLabel: '180',
+                editable: true,
+            },
+            io:{
+                output: {portId: 'servo_position'}
+            }
+        }
+        ],
+        defaults: {
+            scope: 'nodeType',
+            rules: [
+                {
+                    rowId: 'servoRange',
+                    field: 'value',
+                    type: 'literal',
+                    value: { left: '0', right: '180' }
+                }
+            ]
+        }
     }
 };
 

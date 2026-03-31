@@ -1017,3 +1017,110 @@ $border-radius: 0.25rem;
     pointer-events: none;
     user-select: none;
 }
+
+.dualLabelRow {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    min-height: 24px;
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 1.25;
+    color: inherit;
+}
+
+.dualLabelLeft,
+.dualLabelRight {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.dualLabelLeft {
+    text-align: left;
+}
+
+.dualLabelRight {
+    text-align: right;
+    opacity: 0.9;
+}
+
+.dualLabelInput {
+    width: calc(50% - 4px);
+    min-width: 0;
+    border: 1px solid rgba(255, 255, 255, 0.35);
+    border-radius: 6px;
+    padding: 4px 8px;
+    font-size: 12px;
+    line-height: 1.25;
+    color: #111827;
+    background: #ffffff;
+    box-sizing: border-box;
+}
+
+.dualLabelInputLeft {
+    text-align: left;
+}
+
+.dualLabelInputRight {
+    text-align: right;
+}
+
+.sliderRow {
+    width: 100%;
+    display: flex;
+    align-items: center;
+}
+
+.sliderInput {
+    width: 100%;
+    margin: 0;
+    appearance: none;
+    -webkit-appearance: none;
+    background: transparent;
+    height: 22px;
+    cursor: pointer;
+}
+
+/* Track */
+.sliderInput::-webkit-slider-runnable-track {
+    height: 6px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.45);
+    border: 1px solid rgba(255, 255, 255, 0.35);
+}
+
+.sliderInput::-moz-range-track {
+    height: 6px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.45);
+    border: 1px solid rgba(255, 255, 255, 0.35);
+}
+
+/* Round handle */
+.sliderInput::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 14px;
+    height: 14px;
+    margin-top: -5px;
+    border-radius: 50%;
+    border: 2px solid #ffffff;
+    background: #ffab19;
+}
+
+.sliderInput::-moz-range-thumb {
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    border: 2px solid #ffffff;
+    background: #ffab19;
+}
+
+.sliderInput:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}

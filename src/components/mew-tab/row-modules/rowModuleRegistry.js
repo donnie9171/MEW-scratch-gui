@@ -9,14 +9,17 @@ import TextInputRow from './TextInputRow';
 import DropdownRow from './DropdownRow';
 import StatusRow from './StatusRow';
 import NotepadTemplateRow from './NotepadTemplateRow';
-
+import DualLabelRow from './DualLabelRow';
+import SliderRow from './SliderRow';
 
 const rowModuleRegistry = {
     title: TitleRow,
     textInput: TextInputRow,
     dropdown: DropdownRow,
     status: StatusRow,
-    notepadTemplate: NotepadTemplateRow
+    notepadTemplate: NotepadTemplateRow,
+    dualLabel: DualLabelRow,
+    slider: SliderRow
 };
 
 /**
