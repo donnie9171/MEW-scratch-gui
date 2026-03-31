@@ -18,6 +18,7 @@ export const createRunManager = ({
     getVm,
     applyNodeStatus,
     applyNodeRuntimePatch,
+    applyNodeDataPatch,
     onExecutionEvent
 }) => {
     const runtimeStore = createRuntimeStore();

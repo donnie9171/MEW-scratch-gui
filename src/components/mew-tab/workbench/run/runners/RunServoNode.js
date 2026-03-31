@@ -1,4 +1,5 @@
 import RunNode from '../runNode';
+import { sendServoPositionToEsp32 } from "../../../helper/esp32Serial";
 
 const toFiniteNumber = (value, fallback) => {
     const n = Number(value);
@@ -49,6 +50,21 @@ class RunServoNode extends RunNode {
         }
 
         const servoPosition = rangeMin + normalized * (rangeMax - rangeMin);
+
+        const servoKey = String(this.node?.data?.servoId?.value || "").trim();
+
+        if (servoKey) {
+            try {
+                await sendServoPositionToEsp32({
+                    servoKey,
+                    position: servoPosition
+                });
+            } catch (error) {
+                this.patchRuntime({
+                    serialError: String(error?.message || error)
+                });
+            }
+        }
 
         this.setOutput('servo_position', servoPosition);
 

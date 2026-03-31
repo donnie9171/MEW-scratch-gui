@@ -44,6 +44,7 @@ import {
     setupScratchBroadcastReceiver,
     attachScratchBroadcastProbe
 } from "./helper/scratchVm";
+import { sendServoPositionToEsp32 } from "./helper/esp32Serial";
 
 const PROJECT_STORAGE_KEY = "mew.project.graph.v1";
 const STATUS_ROW_ID = "state";
@@ -1549,6 +1550,24 @@ const WorkbenchPanel = ({
     }, [addNodeAtPosition]);
 
     const handleNodeModuleChange = ({ nodeId, moduleId, newValue }) => {
+        const node = graphRef.current?.nodes?.find(n => n.id === nodeId);
+
+        if (node?.type === "Servo" && moduleId === "servoValue") {
+            const normalized = Math.max(0, Math.min(1, toFiniteNumber(newValue, 0.5)));
+            const range = node?.data?.servoRange?.value || {};
+            const min = toFiniteNumber(range.left, 0);
+            const max = toFiniteNumber(range.right, 180);
+            const servoPosition = min + normalized * (max - min);
+
+            const servoKey = String(node?.data?.servoId?.value || "").trim();
+            if (servoKey) {
+                sendServoPositionToEsp32({
+                    servoKey,
+                    position: servoPosition
+                }).catch(() => {});
+            }
+        }
+
         setGraph((prev) => ({
             ...prev,
             nodes: prev.nodes.map((n) => {
