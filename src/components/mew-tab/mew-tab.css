@@ -389,6 +389,7 @@ $border-radius: 0.25rem;
     justify-content: space-between;
     gap: 4px;
     min-height: 28px;
+    width: 100%;
     font-weight: bold;
     color: inherit; /* use node text color */
 }
@@ -596,7 +597,7 @@ $border-radius: 0.25rem;
 }
 
 .statusError {
-    background-color: #991b1b;
+    background-color: #ff4949;
 }
 
 .statusComplete {
@@ -604,7 +605,7 @@ $border-radius: 0.25rem;
 }
 
 .statusListening {
-    background-color: #c70f0f;
+    background-color: #ff1717;
 }
 
 /* Node-type colors */

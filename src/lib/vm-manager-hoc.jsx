@@ -31,6 +31,25 @@ const vmManagerHOC = function (WrappedComponent) {
             if (!this.props.vm.initialized) {
                 this.audioEngine = new AudioEngine();
                 this.props.vm.attachAudioEngine(this.audioEngine);
+                
+            if (this.audioEngine.audioContext && typeof this.audioEngine.audioContext.createAnalyser === 'function') {
+                const outputAnalyser = this.audioEngine.audioContext.createAnalyser();
+                outputAnalyser.fftSize = 2048;
+
+                const tapNode = typeof this.audioEngine.getInputNode === 'function'
+                    ? this.audioEngine.getInputNode()
+                    : this.audioEngine.inputNode;
+
+                if (tapNode && typeof tapNode.connect === 'function') {
+                    // Tap project audio output path; does not request microphone access.
+                    tapNode.connect(outputAnalyser);
+                }
+
+                this.audioEngine._outputAnalyser = outputAnalyser;
+                this.audioEngine._analyserDataArray = new Float32Array(outputAnalyser.fftSize);
+            }
+                
+                this.props.vm.attachAudioEngine(this.audioEngine);
                 this.props.vm.setCompatibilityMode(true);
                 this.props.vm.initialized = true;
                 this.props.vm.setLocale(this.props.locale, this.props.messages);

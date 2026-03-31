@@ -172,23 +172,18 @@ export const NODE_DEFINITIONS = {
             ]
         }
     },
-
     Audio: {
         rows: [
-            { id: 'state', type: 'status', props: {label: "Audio", icon: LuAudioWaveform}},
-            {id: 'name', type: 'textInput', props: {label: 'Name', placeholder: 'Audio name'}}
-        ],
-        defaults: {
-            scope: 'nodeType',
-            rules: [
-                {rowId: 'name', field: 'value', type: 'template', template: 'Audio {seq:3}'}
-            ]
-        }
+            { id: 'state', type: 'status', props: {label: "Audio level", icon: LuAudioWaveform}, io:{
+                input: {portId: 'trigger'},
+                output: {portId: 'audio_level'}
+            }}
+        ]
     },
     Servo: {
         rows: [
             { id: 'state', type: 'status', props: {label: "Servo", icon: FaGears}},
-            {id: 'title', type: 'title', props: {text: 'Servo'}}
+            {id: 'servoId', type: 'textInput', props: {label: 'Servo ID', placeholder: 'servo pin number'}},
         ]
     }
 };

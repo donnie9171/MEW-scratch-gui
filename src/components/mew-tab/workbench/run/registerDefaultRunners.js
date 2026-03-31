@@ -7,6 +7,7 @@ import RunVariableNode from './runners/RunVariableNode';
 import RunReceiverNode from './runners/RunReceiverNode';
 import RunBroadcasterNode from './runners/RunBroadcasterNode';
 import RunMicrophoneNode from './runners/RunMicrophoneNode';
+import RunAudioNode from './runners/RunAudioNode';
 
 let didRegisterDefaultRunners = false;
 
@@ -24,5 +25,6 @@ export const registerDefaultRunners = () => {
     registerRunnerByType('Receiver', RunReceiverNode);
     registerRunnerByType('Broadcaster', RunBroadcasterNode);
     registerRunnerByType('Microphone', RunMicrophoneNode);
+    registerRunnerByType('Audio', RunAudioNode);
     didRegisterDefaultRunners = true;
 };

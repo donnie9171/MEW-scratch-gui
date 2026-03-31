@@ -2,9 +2,7 @@ import React from "react";
 import styles from "../mew-tab.css";
 
 import { FaHourglass } from "react-icons/fa6";
-import { FaRedoAlt } from "react-icons/fa";
-import { FaMicrophone, FaCheck } from "react-icons/fa";
-import { MdReportGmailerrorred } from "react-icons/md";
+import { FaMicrophone, FaCheck, FaTimes, FaRedoAlt } from "react-icons/fa";
 
 const STATUS_META = {
     queued: {
@@ -25,7 +23,7 @@ const STATUS_META = {
     error: {
         label: "Error",
         className: styles.statusError,
-        Icon: MdReportGmailerrorred,
+        Icon: FaTimes,
     },
     complete: {
         label: "Complete",
