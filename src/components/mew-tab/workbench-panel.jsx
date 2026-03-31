@@ -247,6 +247,45 @@ const WorkbenchPanel = ({
         );
     };
 
+    const getEdgeArrowPath = (p1, p2) => {
+        // Bezier curve control points (from bezierPath function)
+        const dx = Math.abs(p2.x - p1.x) * 0.5;
+        const cp1 = { x: p1.x + dx, y: p1.y };
+        const cp2 = { x: p2.x - dx, y: p2.y };
+        
+        // Calculate position and tangent at t=0.5 on the bezier curve
+        const t = 0.5;
+        const mt = 1 - t; // 0.5
+        
+        // Position on curve: B(t) = (1-t)³P0 + 3(1-t)²tP1 + 3(1-t)t²P2 + t³P3
+        const px = mt*mt*mt * p1.x + 3*mt*mt*t * cp1.x + 3*mt*t*t * cp2.x + t*t*t * p2.x;
+        const py = mt*mt*mt * p1.y + 3*mt*mt*t * cp1.y + 3*mt*t*t * cp2.y + t*t*t * p2.y;
+        
+        // Tangent vector (derivative) at t=0.5: B'(t) = 3(1-t)²(P1-P0) + 6(1-t)t(P2-P1) + 3t²(P3-P2)
+        const tangentX = 3*mt*mt * (cp1.x - p1.x) + 6*mt*t * (cp2.x - cp1.x) + 3*t*t * (p2.x - cp2.x);
+        const tangentY = 3*mt*mt * (cp1.y - p1.y) + 6*mt*t * (cp2.y - cp1.y) + 3*t*t * (p2.y - cp2.y);
+        
+        // Get angle from tangent vector
+        const angle = Math.atan2(tangentY, tangentX);
+        
+        // Triangle arrow size
+        const arrowLength = 6;
+        const arrowWidth = 6;
+        
+        // Calculate triangle points (pointing along tangent direction)
+        const tipX = px + arrowLength * Math.cos(angle);
+        const tipY = py + arrowLength * Math.sin(angle);
+        
+        // Back corners perpendicular to tangent direction
+        const perpAngle = angle + Math.PI / 2;
+        const c1x = px - arrowLength * Math.cos(angle) + arrowWidth * Math.cos(perpAngle);
+        const c1y = py - arrowLength * Math.sin(angle) + arrowWidth * Math.sin(perpAngle);
+        const c2x = px - arrowLength * Math.cos(angle) - arrowWidth * Math.cos(perpAngle);
+        const c2y = py - arrowLength * Math.sin(angle) - arrowWidth * Math.sin(perpAngle);
+        
+        return `M ${tipX} ${tipY} L ${c1x} ${c1y} L ${c2x} ${c2y} Z`;
+    };
+
     const blurActiveEditableIfClickOff = (target) => {
         const active = document.activeElement;
         if (!isEditableElement(active)) return;
@@ -1612,11 +1651,18 @@ const WorkbenchPanel = ({
                     );
                     if (!p1 || !p2) return null;
                     return (
-                        <path
-                            key={edge.id}
-                            className={styles.connectionPath}
-                            d={bezierPath(p1, p2)}
-                        />
+                        <g key={edge.id}>
+                            <path
+                                className={styles.connectionPath}
+                                d={bezierPath(p1, p2)}
+                            />
+                            <path
+                                className={styles.edgeArrow}
+                                d={getEdgeArrowPath(p1, p2)}
+                                fill="white"
+                                stroke="none"
+                            />
+                        </g>
                     );
                 })}
 

@@ -59,8 +59,8 @@ $border-radius: 0.25rem;
 }
 
 .workbenchNode {
-    cursor: grab;
-    user-select: none;
+    position: relative;
+    z-index: 2; /* Above connections */
 }
 
 .nodeDragging {
@@ -114,9 +114,10 @@ $border-radius: 0.25rem;
 
 .connectionsLayer {
     position: absolute;
-    inset: 0;
+    top: 0;
+    left: 0;
     pointer-events: none;
-    z-index: 5;
+    z-index: 1; /* Behind nodes */
 }
 
 .connectionPath {
