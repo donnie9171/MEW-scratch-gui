@@ -152,20 +152,6 @@ export const sendScratchBroadcastMessage = (vm, messageName) => {
     const safeMessage = String(messageName || "").trim();
     const runtimes = getBroadcastRuntimes(vm);
 
-    // eslint-disable-next-line no-console
-    console.log("[MEW BROADCAST DEBUG] emit attempt", {
-        safeMessage,
-        hasVm: Boolean(vm),
-        runtimeCount: runtimes.length,
-        listenerCounts: runtimes.map((runtime, index) => ({
-            index,
-            count:
-                typeof runtime?.listenerCount === "function"
-                    ? runtime.listenerCount("broadcast_message")
-                    : "n/a",
-        })),
-    });
-
     if (!safeMessage) return false;
     if (!runtimes.length) return false;
 
@@ -186,13 +172,6 @@ export const sendScratchBroadcastMessage = (vm, messageName) => {
         }
     }
 
-    // eslint-disable-next-line no-console
-    console.log("[MEW BROADCAST DEBUG] emit done", {
-        safeMessage,
-        emitted,
-        runtimeCount: runtimes.length,
-    });
-
     return emitted;
 };
 
@@ -210,13 +189,6 @@ export const setupScratchBroadcastReceiver =
     (vm) =>
     ({ messageName, onReceive }) => {
         const runtime = vm?.runtime || getScratchRuntime(vm);
-
-        // eslint-disable-next-line no-console
-        console.log("[MEW BROADCAST DEBUG] receiver setup attempt", {
-            messageName,
-            hasVm: Boolean(vm),
-            hasRuntime: Boolean(runtime),
-        });
 
         if (!runtime || typeof messageName !== "string") return () => {};
 
@@ -243,16 +215,6 @@ export const setupScratchBroadcastReceiver =
             const incomingKey = normalizeBroadcastKey(incomingRaw);
 
             if (incomingKey) {
-                // eslint-disable-next-line no-console
-                console.log("[MEW BROADCAST DEBUG] startHats intercepted", {
-                    requestedHatOpcode,
-                    expectedRaw,
-                    incomingRaw,
-                    expectedKey,
-                    incomingKey,
-                    matched: incomingKey === expectedKey,
-                    targetId: target?.id,
-                });
 
                 if (
                     incomingKey === expectedKey &&
@@ -306,11 +268,6 @@ export const attachScratchBroadcastProbe = (vm) => {
                 looksBroadcastLike(eventName) ||
                 args.some(looksBroadcastLike)
             ) {
-                // eslint-disable-next-line no-console
-                console.log("[MEW BROADCAST PROBE] runtime.emit", {
-                    eventName,
-                    args,
-                });
             }
             return originals.emit(eventName, ...args);
         };
@@ -322,12 +279,6 @@ export const attachScratchBroadcastProbe = (vm) => {
                 looksBroadcastLike(requestedHatOpcode) ||
                 looksBroadcastLike(matchFields)
             ) {
-                // eslint-disable-next-line no-console
-                console.log("[MEW BROADCAST PROBE] runtime.startHats", {
-                    requestedHatOpcode,
-                    matchFields,
-                    targetId: target?.id,
-                });
             }
             return originals.startHats(requestedHatOpcode, matchFields, target);
         };
@@ -343,15 +294,6 @@ export const attachScratchBroadcastProbe = (vm) => {
                 looksBroadcastLike(requestedHatOpcode) ||
                 looksBroadcastLike(matchFields)
             ) {
-                // eslint-disable-next-line no-console
-                console.log(
-                    "[MEW BROADCAST PROBE] runtime.startHatsAndReturnPrimitives",
-                    {
-                        requestedHatOpcode,
-                        matchFields,
-                        targetId: target?.id,
-                    },
-                );
             }
             return originals.startHatsAndReturnPrimitives(
                 requestedHatOpcode,
@@ -361,9 +303,6 @@ export const attachScratchBroadcastProbe = (vm) => {
         };
     }
 
-    // eslint-disable-next-line no-console
-    console.log("[MEW BROADCAST PROBE] attached");
-
     return () => {
         if (originals.emit) runtime.emit = originals.emit;
         if (originals.startHats) runtime.startHats = originals.startHats;
@@ -371,8 +310,6 @@ export const attachScratchBroadcastProbe = (vm) => {
             runtime.startHatsAndReturnPrimitives =
                 originals.startHatsAndReturnPrimitives;
         }
-        // eslint-disable-next-line no-console
-        console.log("[MEW BROADCAST PROBE] detached");
     };
 };
 

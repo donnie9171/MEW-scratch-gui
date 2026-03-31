@@ -9,22 +9,9 @@ class RunBroadcasterNode extends RunNode {
         ).trim();
         const vm = this.context?.vm || null;
 
-        // eslint-disable-next-line no-console
-        console.log('[MEW BROADCAST DEBUG] Broadcaster.run', {
-            nodeId: this.node?.id,
-            selectedMessage,
-            hasVm: Boolean(vm),
-            hasRuntime: Boolean(vm?.runtime)
-        });
 
         if (selectedMessage && vm) {
             const ok = sendScratchBroadcastMessage(vm, selectedMessage);
-            // eslint-disable-next-line no-console
-            console.log('[MEW BROADCAST DEBUG] sendScratchBroadcastMessage result', {
-                nodeId: this.node?.id,
-                selectedMessage,
-                ok
-            });
         } else {
             // eslint-disable-next-line no-console
             console.warn('[MEW BROADCAST DEBUG] skipped emit', {

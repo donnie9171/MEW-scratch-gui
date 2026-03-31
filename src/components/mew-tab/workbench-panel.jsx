@@ -551,14 +551,6 @@ const WorkbenchPanel = ({
                     node?.data?.message?.value || node?.data?.message || "",
                 ).trim();
 
-                // eslint-disable-next-line no-console
-                console.log("[MEW BROADCAST DEBUG] receiver node discovered", {
-                    nodeId: node.id,
-                    messageName,
-                    hasVm: Boolean(vm),
-                    hasRuntime: Boolean(vm?.runtime),
-                });
-
                 if (!messageName) return null;
 
 
@@ -574,14 +566,6 @@ const WorkbenchPanel = ({
                             clusters,
                         );
 
-                        // eslint-disable-next-line no-console
-                        console.log("[MEW BROADCAST DEBUG] onReceive", {
-                            nodeId: node.id,
-                            messageName,
-                            incoming,
-                            clusterIndex,
-                        });
-
                         if (clusterIndex === -1) return;
 
                         const runningClusters =
@@ -590,25 +574,9 @@ const WorkbenchPanel = ({
                             runningClusters &&
                             runningClusters.has(clusterIndex);
 
-                        // eslint-disable-next-line no-console
-                        console.log("[MEW BROADCAST DEBUG] cluster gate", {
-                            nodeId: node.id,
-                            clusterIndex,
-                            alreadyRunning,
-                        });
-
                         if (alreadyRunning) return;
 
                         runManager.runNodeCluster(node.id).catch((error) => {
-                            // eslint-disable-next-line no-console
-                            console.error(
-                                "[MEW] Receiver-triggered run failed",
-                                {
-                                    nodeId: node.id,
-                                    messageName,
-                                    error: String(error?.message || error),
-                                },
-                            );
                         });
                     },
                 });
