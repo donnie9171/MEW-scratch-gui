@@ -1049,7 +1049,7 @@ $border-radius: 0.25rem;
 }
 
 .dualLabelInput {
-    width: calc(50% - 4px);
+    width: 50px;
     min-width: 0;
     border: 1px solid rgba(255, 255, 255, 0.35);
     border-radius: 6px;
@@ -1073,6 +1073,82 @@ $border-radius: 0.25rem;
     width: 100%;
     display: flex;
     align-items: center;
+    position: relative;
+    padding-top: 16px;
+    padding-bottom: 16px;
+}
+
+.sliderTooltip {
+    position: absolute;
+    transform: translateX(-50%);
+    min-width: 56px;
+    border-radius: 8px;
+    background: #ffffff;
+    border: 1px solid #9ca3af;
+    box-shadow: 0 10px 24px rgba(0, 0, 0, 0.24);
+    z-index: 10;
+    pointer-events: none;
+    text-align: center;
+    padding: 6px 8px;
+    font-size: 12px;
+    line-height: 1.2;
+    color: #111827;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.sliderTooltipTop {
+    bottom: calc(100%);
+}
+
+.sliderTooltipBottom {
+    top: calc(100%);
+}
+
+/* Top tooltip arrow (points down to handle) */
+.sliderTooltipTop::before {
+    content: "";
+    position: absolute;
+    bottom: -8px;
+    left: 50%;
+    transform: translateX(-50%);
+    border-left: 8px solid transparent;
+    border-right: 8px solid transparent;
+    border-top: 8px solid #9ca3af;
+}
+
+.sliderTooltipTop::after {
+    content: "";
+    position: absolute;
+    bottom: -7px;
+    left: 50%;
+    transform: translateX(-50%);
+    border-left: 7px solid transparent;
+    border-right: 7px solid transparent;
+    border-top: 7px solid #ffffff;
+}
+
+/* Bottom tooltip arrow (points up to handle) */
+.sliderTooltipBottom::before {
+    content: "";
+    position: absolute;
+    top: -8px;
+    left: 50%;
+    transform: translateX(-50%);
+    border-left: 8px solid transparent;
+    border-right: 8px solid transparent;
+    border-bottom: 8px solid #9ca3af;
+}
+
+.sliderTooltipBottom::after {
+    content: "";
+    position: absolute;
+    top: -7px;
+    left: 50%;
+    transform: translateX(-50%);
+    border-left: 7px solid transparent;
+    border-right: 7px solid transparent;
+    border-bottom: 7px solid #ffffff;
 }
 
 .sliderInput {

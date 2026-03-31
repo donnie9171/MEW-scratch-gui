@@ -375,6 +375,25 @@ const WorkbenchPanel = ({
                     }),
                 }));
             },
+            applyNodeDataPatch: (nodeId, rowId, field, value) => {
+                suppressNextCheckpointRef.current = true;
+                setGraph((prev) => ({
+                    ...prev,
+                    nodes: prev.nodes.map((node) => {
+                        if (node.id !== nodeId) return node;
+                        return {
+                            ...node,
+                            data: {
+                                ...(node.data || {}),
+                                [rowId]: {
+                                    ...((node.data && node.data[rowId]) || {}),
+                                    [field]: value,
+                                },
+                            },
+                        };
+                    }),
+                }));
+            },
             onExecutionEvent: (event) => {
                 // eslint-disable-next-line no-console
                 console.log("[MEW RUN DEBUG] event", event);
@@ -602,13 +621,17 @@ const WorkbenchPanel = ({
         };
     }, [graph.nodes, vm]);
 
-    const getRowContextByNodeType = (nodeType) => {
+    const toFiniteNumber = (value, fallback) => {
+        const n = Number(value);
+        return Number.isFinite(n) ? n : fallback;
+    };
+
+    const getRowContextByNodeType = (nodeType, node = null) => {
         if (nodeType === "Variable") {
             return {
                 variableName: {
                     options: scratchVariableDropdownOptions,
-                    defaultValue:
-                        scratchVariableDropdownOptions[0]?.value || "",
+                    defaultValue: scratchVariableDropdownOptions[0]?.value || "",
                     disabled: scratchVariableNames.length === 0,
                 },
             };
@@ -618,9 +641,34 @@ const WorkbenchPanel = ({
             return {
                 message: {
                     options: scratchBroadcastDropdownOptions,
-                    defaultValue:
-                        scratchBroadcastDropdownOptions[0]?.value || "",
+                    defaultValue: scratchBroadcastDropdownOptions[0]?.value || "",
                     disabled: scratchBroadcastNames.length === 0,
+                },
+            };
+        }
+
+        if (nodeType === "Servo" && node) {
+            const runtime = node?.data?.__runtime || {};
+            const clusterIndex = runtime?.cluster;
+            const runningClusters =
+                runManagerRef.current?.runtimeStore?.getState?.()?.runningClusters;
+
+            const inRunningCluster =
+                typeof clusterIndex === "number" &&
+                runningClusters instanceof Set &&
+                runningClusters.has(clusterIndex);
+
+            const rangeValue = node?.data?.servoRange?.value || {};
+            const rangeMin = toFiniteNumber(rangeValue.left, 0);
+            const rangeMax = toFiniteNumber(rangeValue.right, 180);
+
+            return {
+                servoValue: {
+                    controlledValue: inRunningCluster ? runtime?.servoNormalizedInput : undefined,
+                    disabled: inRunningCluster,
+                    showTooltips: true,
+                    rangeMin,
+                    rangeMax,
                 },
             };
         }
@@ -1623,7 +1671,7 @@ const WorkbenchPanel = ({
                           })
                         : baseModules;
 
-                const rowContextById = getRowContextByNodeType(node.type);
+                const rowContextById = getRowContextByNodeType(node.type, node);
 
                 return (
                     <div
@@ -1780,6 +1828,7 @@ const WorkbenchPanel = ({
                                     onPortPointerDown={() => {}}
                                     rowContextById={getRowContextByNodeType(
                                         preview.nodeType,
+                                        graph.nodes.find((n) => n.id === preview.nodeId) || null
                                     )}
                                 />
                             </div>

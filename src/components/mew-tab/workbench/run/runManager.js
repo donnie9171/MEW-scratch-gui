@@ -38,6 +38,12 @@ export const createRunManager = ({
         if (typeof applyNodeRuntimePatch === 'function') applyNodeRuntimePatch(nodeId, patch);
     };
 
+    const patchNodeData = (nodeId, rowId, field, value) => {
+        if (typeof applyNodeDataPatch === 'function') {
+            applyNodeDataPatch(nodeId, rowId, field, value);
+        }
+    };
+
     const runNodeById = async nodeId => {
         const graph = getGraph();
         const nodes = graph?.nodes || [];
@@ -50,7 +56,8 @@ export const createRunManager = ({
             runtimeStore,
             graph,
             vm: typeof getVm === 'function' ? getVm() : null,
-            patchRuntime: (id, patch) => patchRuntime(id, patch)
+            patchRuntime: (id, patch) => patchRuntime(id, patch),
+            patchNodeData: (id, rowId, field, value) => patchNodeData(id, rowId, field, value)
         };
         const runner = createRunnerForNode(node, context);
 
@@ -64,7 +71,6 @@ export const createRunManager = ({
                 outputsByPort: runtimeStore.getNodeState(node.id).outputsByPort || {},
                 tooltipAutoShowUntil: isLeafNode ? Date.now() + 5000 : undefined
             });
-            setStatus(node.id, 'complete');
             emit('nodeCompleted', {nodeId: node.id});
         } catch (error) {
             setStatus(node.id, 'error');
@@ -120,7 +126,8 @@ export const createRunManager = ({
                     runtimeStore,
                     graph,
                     vm: typeof getVm === 'function' ? getVm() : null,
-                    patchRuntime: (id, patch) => patchRuntime(id, patch)
+                    patchRuntime: (id, patch) => patchRuntime(id, patch),
+                    patchNodeData: (id, rowId, field, value) => patchNodeData(id, rowId, field, value)
                 });
 
                 setStatus(node.id, 'running');
