@@ -751,6 +751,21 @@ class MenuBar extends React.Component {
                             id="gui.menuBar.undo"
                         />
                     </div>
+                    <Divider className={classNames(styles.divider)} />
+                    <div
+                        className={classNames(styles.menuBarItem, styles.hoverable)}
+                        onMouseUp={() => window.open(
+                            'https://fireworks-studios.gitbook.io/fireworks-studios/mew-multi-agent-exploration-workbench',
+                            '_blank',
+                            'noopener,noreferrer'
+                        )}
+                    >
+                        <FormattedMessage
+                            defaultMessage="Docs"
+                            description="Link to the MEW documentation"
+                            id="gui.menuBar.docs"
+                        />
+                    </div>
                 </div>
 
                 {/* show the proper UI in the account menu, given whether the user is
