@@ -8,21 +8,21 @@ const toFiniteNumber = (value, fallback) => {
 
 const clamp01 = value => Math.max(0, Math.min(1, value));
 
-const resolveNormalizedInput = (rawInput, fallback = 0.5) => {
-    if (rawInput === undefined || rawInput === null) return clamp01(fallback);
+const resolveInputValue = (rawInput, fallback = 0.5) => {
+    if (rawInput === undefined || rawInput === null) return toFiniteNumber(fallback, 0.5);
 
     if (typeof rawInput === 'number' || typeof rawInput === 'string') {
-        return clamp01(toFiniteNumber(rawInput, fallback));
+        return toFiniteNumber(rawInput, fallback);
     }
 
     if (typeof rawInput === 'object') {
         const first = Object.values(rawInput)
             .map(v => toFiniteNumber(v, NaN))
             .find(v => Number.isFinite(v));
-        return clamp01(Number.isFinite(first) ? first : fallback);
+        return Number.isFinite(first) ? first : toFiniteNumber(fallback, 0.5);
     }
 
-    return clamp01(fallback);
+    return toFiniteNumber(fallback, 0.5);
 };
 
 class RunServoNode extends RunNode {
@@ -35,21 +35,35 @@ class RunServoNode extends RunNode {
     }
 
     async run () {
-        const range = this.node?.data?.servoRange?.value || {};
-        const rangeMin = toFiniteNumber(range.left, 0);
-        const rangeMax = toFiniteNumber(range.right, 180);
+        const normalizedRange = this.node?.data?.normalizedLabel?.value || {};
+        const normalizedMin = toFiniteNumber(normalizedRange.left, 0);
+        const normalizedMax = toFiniteNumber(normalizedRange.right, 1);
+
+        const servoRange = this.node?.data?.servoRange?.value || {};
+        const servoMin = toFiniteNumber(servoRange.left, 0);
+        const servoMax = toFiniteNumber(servoRange.right, 180);
 
         const manualSlider = toFiniteNumber(this.node?.data?.servoValue?.value, 0.5);
         const incomingNormalized = this.getInput('normalized_value');
-        const normalized = resolveNormalizedInput(incomingNormalized, manualSlider);
-
+        
+        // Convert from input range to 0-1
+        let normalized;
         if (incomingNormalized !== undefined && incomingNormalized !== null) {
+            const inValue = resolveInputValue(incomingNormalized, manualSlider);
+            const span = normalizedMax - normalizedMin;
+            // Map from [normalizedMin, normalizedMax] to [0, 1]
+            normalized = span === 0 ? 0 : (inValue - normalizedMin) / span;
+            normalized = clamp01(normalized);
+            
             if (typeof this.context?.patchNodeData === 'function') {
                 this.context.patchNodeData(this.node.id, 'servoValue', 'value', normalized);
             }
+        } else {
+            normalized = clamp01(manualSlider);
         }
 
-        const servoPosition = rangeMin + normalized * (rangeMax - rangeMin);
+        // Convert from 0-1 to servo range
+        const servoPosition = servoMin + normalized * (servoMax - servoMin);
 
         const servoKey = String(this.node?.data?.servoId?.value || "").trim();
 

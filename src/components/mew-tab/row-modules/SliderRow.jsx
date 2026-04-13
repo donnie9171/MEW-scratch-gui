@@ -26,6 +26,8 @@ const SliderRow = ({
 
     // Row-context driven behavior for Servo
     controlledValue,
+    inputRangeMin = 0,
+    inputRangeMax = 1,
     rangeMin = 0,
     rangeMax = 180,
     showTooltips = true
@@ -88,6 +90,9 @@ const SliderRow = ({
     }, [hasControlledValue, controlledNormalized]);
 
     const effectiveNormalized = hasControlledValue ? controlledNormalized : sliderValue;
+    const inputValue =
+        toFiniteNumber(inputRangeMin, 0) +
+        effectiveNormalized * (toFiniteNumber(inputRangeMax, 1) - toFiniteNumber(inputRangeMin, 0));
     const convertedValue =
         toFiniteNumber(rangeMin, 0) +
         effectiveNormalized * (toFiniteNumber(rangeMax, 180) - toFiniteNumber(rangeMin, 0));
@@ -111,7 +116,7 @@ const SliderRow = ({
                     className={`${styles.sliderTooltip} ${styles.sliderTooltipTop}`}
                     style={{ left: percentFromNormalized(effectiveNormalized) }}
                 >
-                    {formatNumber(effectiveNormalized)}
+                    {formatNumber(inputValue)}
                 </div>
             )}
 

@@ -148,6 +148,83 @@ const getBroadcastRuntimes = (vm) => {
     return Array.from(new Set(candidates));
 };
 
+const broadcastHookStateByRuntime = new WeakMap();
+
+const scheduleMicrotask = (callback) => {
+    if (typeof queueMicrotask === "function") {
+        queueMicrotask(callback);
+        return;
+    }
+
+    Promise.resolve()
+        .then(callback)
+        .catch(() => {});
+};
+
+const getBroadcastHookState = (runtime) => {
+    if (!runtime || typeof runtime.startHats !== "function") return null;
+
+    const existing = broadcastHookStateByRuntime.get(runtime);
+    if (existing) return existing;
+
+    const originalStartHats = runtime.startHats.bind(runtime);
+    const handlersByKey = new Map();
+
+    const state = {
+        originalStartHats,
+        handlersByKey,
+    };
+
+    runtime.startHats = (requestedHatOpcode, matchFields, target) => {
+        const incomingRaw = extractBroadcastFromStartHats(
+            requestedHatOpcode,
+            matchFields,
+        );
+        const incomingKey = normalizeBroadcastKey(incomingRaw);
+        const result = originalStartHats(requestedHatOpcode, matchFields, target);
+
+        if (incomingKey) {
+            const handlers = handlersByKey.get(incomingKey);
+            if (handlers && handlers.size > 0) {
+                scheduleMicrotask(() => {
+                    handlers.forEach(handler => {
+                        try {
+                            handler(incomingRaw);
+                        } catch (error) {
+                            // eslint-disable-next-line no-console
+                            console.warn(
+                                "[MEW BROADCAST DEBUG] receiver callback failed",
+                                error,
+                            );
+                        }
+                    });
+                });
+            }
+        }
+
+        return result;
+    };
+
+    broadcastHookStateByRuntime.set(runtime, state);
+    return state;
+};
+
+const releaseBroadcastHookState = (runtime) => {
+    const state = broadcastHookStateByRuntime.get(runtime);
+    if (!state) return;
+
+    runtime.startHats = state.originalStartHats;
+    broadcastHookStateByRuntime.delete(runtime);
+};
+
+export const detachScratchBroadcastHooks = (vm) => {
+    const runtimes = getBroadcastRuntimes(vm);
+
+    runtimes.forEach((runtime) => {
+        releaseBroadcastHookState(runtime);
+    });
+};
+
 export const sendScratchBroadcastMessage = (vm, messageName) => {
     const safeMessage = String(messageName || "").trim();
     const runtimes = getBroadcastRuntimes(vm);
@@ -196,120 +273,44 @@ export const setupScratchBroadcastReceiver =
         const expectedKey = normalizeBroadcastKey(expectedRaw);
         if (!expectedKey) return () => {};
 
-        const originalStartHats =
-            typeof runtime.startHats === "function"
-                ? runtime.startHats.bind(runtime)
-                : null;
+        const hookState = getBroadcastHookState(runtime);
 
-        if (!originalStartHats) {
+        if (!hookState) {
             // eslint-disable-next-line no-console
             console.warn("[MEW BROADCAST DEBUG] runtime.startHats unavailable");
             return () => {};
         }
 
-        runtime.startHats = (requestedHatOpcode, matchFields, target) => {
-            const incomingRaw = extractBroadcastFromStartHats(
-                requestedHatOpcode,
-                matchFields,
-            );
-            const incomingKey = normalizeBroadcastKey(incomingRaw);
-
-            if (incomingKey) {
-
-                if (
-                    incomingKey === expectedKey &&
-                    typeof onReceive === "function"
-                ) {
-                    onReceive(incomingRaw);
-                }
+        const handler = (incomingRaw) => {
+            if (
+                normalizeBroadcastKey(incomingRaw) === expectedKey &&
+                typeof onReceive === "function"
+            ) {
+                onReceive(incomingRaw);
             }
-
-            return originalStartHats(requestedHatOpcode, matchFields, target);
         };
 
+        const handlers = hookState.handlersByKey.get(expectedKey) || new Set();
+        handlers.add(handler);
+        hookState.handlersByKey.set(expectedKey, handlers);
+
         return () => {
-            runtime.startHats = originalStartHats;
+            const currentHookState = broadcastHookStateByRuntime.get(runtime);
+            if (!currentHookState) return;
+
+            const currentHandlers = currentHookState.handlersByKey.get(expectedKey);
+            if (currentHandlers) {
+                currentHandlers.delete(handler);
+                if (currentHandlers.size === 0) {
+                    currentHookState.handlersByKey.delete(expectedKey);
+                }
+            }
         };
     };
 
 export const attachScratchBroadcastProbe = (vm) => {
-    const runtime = vm?.runtime || getScratchRuntime(vm);
-    if (!runtime) {
-        // eslint-disable-next-line no-console
-        console.warn("[MEW BROADCAST PROBE] no runtime");
-        return () => {};
-    }
-
-    const originals = {
-        emit: runtime.emit?.bind(runtime),
-        startHats: runtime.startHats?.bind(runtime),
-        startHatsAndReturnPrimitives:
-            runtime.startHatsAndReturnPrimitives?.bind(runtime),
-    };
-
-    const looksBroadcastLike = (value) => {
-        const text =
-            typeof value === "string"
-                ? value
-                : (() => {
-                      try {
-                          return JSON.stringify(value);
-                      } catch {
-                          return String(value);
-                      }
-                  })();
-
-        return /broadcast|whenbroadcastreceived|broadcast_message/i.test(text);
-    };
-
-    if (originals.emit) {
-        runtime.emit = (eventName, ...args) => {
-            if (
-                looksBroadcastLike(eventName) ||
-                args.some(looksBroadcastLike)
-            ) {
-            }
-            return originals.emit(eventName, ...args);
-        };
-    }
-
-    if (originals.startHats) {
-        runtime.startHats = (requestedHatOpcode, matchFields, target) => {
-            if (
-                looksBroadcastLike(requestedHatOpcode) ||
-                looksBroadcastLike(matchFields)
-            ) {
-            }
-            return originals.startHats(requestedHatOpcode, matchFields, target);
-        };
-    }
-
-    if (originals.startHatsAndReturnPrimitives) {
-        runtime.startHatsAndReturnPrimitives = (
-            requestedHatOpcode,
-            matchFields,
-            target,
-        ) => {
-            if (
-                looksBroadcastLike(requestedHatOpcode) ||
-                looksBroadcastLike(matchFields)
-            ) {
-            }
-            return originals.startHatsAndReturnPrimitives(
-                requestedHatOpcode,
-                matchFields,
-                target,
-            );
-        };
-    }
-
     return () => {
-        if (originals.emit) runtime.emit = originals.emit;
-        if (originals.startHats) runtime.startHats = originals.startHats;
-        if (originals.startHatsAndReturnPrimitives) {
-            runtime.startHatsAndReturnPrimitives =
-                originals.startHatsAndReturnPrimitives;
-        }
+        void vm;
     };
 };
 

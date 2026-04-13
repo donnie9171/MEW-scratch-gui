@@ -17,6 +17,7 @@ import {
     undoMewGraph,
     checkpointMewGraph,
 } from "../../reducers/mew-graph";
+import { getIsShowingProject } from "../../reducers/project-state";
 import { getActiveTabIndex, MEW_TAB_INDEX } from "../../reducers/editor-tab";
 import {
     areNodeIdsConnected,
@@ -42,7 +43,8 @@ import {
     getScratchVariableAndListNames,
     getScratchBroadcastNames,
     setupScratchBroadcastReceiver,
-    attachScratchBroadcastProbe
+    attachScratchBroadcastProbe,
+    detachScratchBroadcastHooks
 } from "./helper/scratchVm";
 import { sendServoPositionToEsp32 } from "./helper/esp32Serial";
 
@@ -87,6 +89,7 @@ const WorkbenchPanel = ({
     checkpointMewGraph: dispatchCheckpointMewGraph,
     mewGraph,
     isMewTabActive,
+    isScratchProjectReady,
     vm,
 }) => {
     const [graph, setGraph] = useState(
@@ -377,6 +380,8 @@ const WorkbenchPanel = ({
         vmRef.current = vm;
     }, [vm]);
 
+    const receiverBroadcastRegistrationsRef = useRef(new Map());
+
     useEffect(() => {
         registerDefaultRunners();
 
@@ -457,6 +462,16 @@ const WorkbenchPanel = ({
     }, [handleRunSelected, graph]);
 
     useEffect(() => {
+        if (!isScratchProjectReady) {
+            setScratchVariableNames((prev) =>
+                prev.length ? [] : prev,
+            );
+            setScratchBroadcastNames((prev) =>
+                prev.length ? [] : prev,
+            );
+            return undefined;
+        }
+
         let canceled = false;
 
         const syncScratchVariables = () => {
@@ -488,9 +503,13 @@ const WorkbenchPanel = ({
             canceled = true;
             window.clearInterval(intervalId);
         };
-    }, [vm]);
+    }, [vm, isScratchProjectReady]);
 
     useEffect(() => {
+        if (!isScratchProjectReady || scratchVariableNames.length === 0) {
+            return;
+        }
+
         const availableNames = new Set(scratchVariableNames);
         const fallbackValue = scratchVariableNames[0] || "";
 
@@ -530,9 +549,13 @@ const WorkbenchPanel = ({
                 meta: { ...prev.meta, updatedAt: new Date().toISOString() },
             };
         });
-    }, [scratchVariableNames]);
+    }, [scratchVariableNames, isScratchProjectReady]);
 
     useEffect(() => {
+        if (!isScratchProjectReady || scratchBroadcastNames.length === 0) {
+            return;
+        }
+
         const availableNames = new Set(scratchBroadcastNames);
         const fallbackValue = scratchBroadcastNames[0] || "";
 
@@ -573,32 +596,48 @@ const WorkbenchPanel = ({
                 meta: { ...prev.meta, updatedAt: new Date().toISOString() },
             };
         });
-    }, [scratchBroadcastNames]);
+    }, [scratchBroadcastNames, isScratchProjectReady]);
 
     useEffect(() => {
-        const runManager = runManagerRef.current;
-        if (!runManager || !vm) return undefined;
+        if (!vm) return undefined;
 
         const detachProbe = attachScratchBroadcastProbe(vm);
 
-        const receiverNodes = (graph.nodes || []).filter(
-            (node) => node.type === "Receiver",
-        );
+        return () => {
+            detachProbe();
+            receiverBroadcastRegistrationsRef.current.forEach((cleanup) => {
+                cleanup();
+            });
+            receiverBroadcastRegistrationsRef.current.clear();
+            detachScratchBroadcastHooks(vm);
+        };
+    }, [vm]);
 
-        const cleanups = receiverNodes
-            .map((node) => {
+    useEffect(() => {
+        const runManager = runManagerRef.current;
+        if (!runManager || !vm) return;
+
+        const currentRegistrations = receiverBroadcastRegistrationsRef.current;
+        const nextKeys = new Set();
+        const setupReceiver = setupScratchBroadcastReceiver(vm);
+
+        (graph.nodes || [])
+            .filter((node) => node.type === "Receiver")
+            .forEach((node) => {
                 const messageName = String(
                     node?.data?.message?.value || node?.data?.message || "",
                 ).trim();
 
-                if (!messageName) return null;
+                if (!messageName) return;
 
+                const registrationKey = `${node.id}::${messageName}`;
+                nextKeys.add(registrationKey);
 
+                if (currentRegistrations.has(registrationKey)) return;
 
-                const setupReceiver = setupScratchBroadcastReceiver(vm);
-                return setupReceiver({
+                const cleanup = setupReceiver({
                     messageName,
-                    onReceive: (incoming) => {
+                    onReceive: () => {
                         const latestNodes = graphRef.current?.nodes || [];
                         const clusters = findClusters(latestNodes);
                         const clusterIndex = identifyClusterForNode(
@@ -616,17 +655,26 @@ const WorkbenchPanel = ({
 
                         if (alreadyRunning) return;
 
-                        runManager.runNodeCluster(node.id).catch((error) => {
-                        });
+                        const startCluster = () => {
+                            runManager.runNodeCluster(node.id).catch(() => {});
+                        };
+
+                        if (typeof queueMicrotask === "function") {
+                            queueMicrotask(startCluster);
+                        } else {
+                            setTimeout(startCluster, 0);
+                        }
                     },
                 });
-            })
-            .filter(Boolean);
 
-        return () => {
-            detachProbe();
-            cleanups.forEach((dispose) => dispose());
-        };
+                currentRegistrations.set(registrationKey, cleanup);
+            });
+
+        currentRegistrations.forEach((cleanup, registrationKey) => {
+            if (nextKeys.has(registrationKey)) return;
+            cleanup();
+            currentRegistrations.delete(registrationKey);
+        });
     }, [graph.nodes, vm]);
 
     const toFiniteNumber = (value, fallback) => {
@@ -669,12 +717,17 @@ const WorkbenchPanel = ({
             const rangeValue = node?.data?.servoRange?.value || {};
             const rangeMin = toFiniteNumber(rangeValue.left, 0);
             const rangeMax = toFiniteNumber(rangeValue.right, 180);
+            const inputRangeValue = node?.data?.normalizedLabel?.value || {};
+            const inputRangeMin = toFiniteNumber(inputRangeValue.left, 0);
+            const inputRangeMax = toFiniteNumber(inputRangeValue.right, 1);
 
             return {
                 servoValue: {
                     controlledValue: inRunningCluster ? runtime?.servoNormalizedInput : undefined,
                     disabled: inRunningCluster,
                     showTooltips: true,
+                    inputRangeMin,
+                    inputRangeMax,
                     rangeMin,
                     rangeMax,
                 },
@@ -1892,6 +1945,9 @@ const WorkbenchPanel = ({
 };
 
 const mapStateToProps = (state) => ({
+    isScratchProjectReady: getIsShowingProject(
+        state.scratchGui.projectState.loadingState,
+    ),
     mewGraph: getMewGraph(state),
     isMewTabActive: getActiveTabIndex(state) === MEW_TAB_INDEX,
     vm: state.scratchGui.vm,
