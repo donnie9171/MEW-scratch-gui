@@ -23,8 +23,6 @@ export const createRunManager = ({
 }) => {
     const runtimeStore = createRuntimeStore();
 
-    let isRunning = false;
-
     const emit = (type, payload = {}) => {
         if (typeof onExecutionEvent === 'function') onExecutionEvent({type, ...payload});
     };
@@ -82,11 +80,6 @@ export const createRunManager = ({
     };
 
     const runNodeCluster = async startNodeId => {
-        if (isRunning) {
-            throw new Error('runNodeCluster: execution already in progress');
-        }
-
-        isRunning = true;
         let clusterIndex = null;
         let markedRunning = false;
 
@@ -100,6 +93,11 @@ export const createRunManager = ({
                 throw new Error(`runNodeCluster: start node not found in any cluster: ${startNodeId}`);
             }
 
+            const runningClusters = runtimeStore.getState().runningClusters;
+            if (runningClusters && runningClusters.has(clusterIndex)) {
+                throw new Error(`runNodeCluster: cluster already running: ${clusterIndex}`);
+            }
+
             const clusterNodes = clusters[clusterIndex];
             const sortedNodes = topologicalSort(clusterNodes);
 
@@ -107,11 +105,6 @@ export const createRunManager = ({
             markedRunning = true;
 
             emit('clusterStarted', {clusterIndex, startNodeId});
-
-            const clusterSet = new Set(clusterNodes.map(n => n.id));
-            nodes.forEach(n => {
-                if (!clusterSet.has(n.id)) setStatus(n.id, 'null');
-            });
 
             sortedNodes.forEach((node, order) => {
                 patchRuntime(node.id, {cluster: clusterIndex, sortOrder: order});
@@ -171,7 +164,6 @@ export const createRunManager = ({
             if (markedRunning && clusterIndex !== null) {
                 runtimeStore.unmarkClusterRunning(clusterIndex);
             }
-            isRunning = false;
         }
     };
 

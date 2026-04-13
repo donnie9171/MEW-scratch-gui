@@ -169,10 +169,6 @@ const WorkbenchPanel = ({
 
     const handleRunSelected = async () => {
         if (!canRunSelectedCluster || !selectedNodeIds.length) {
-            // eslint-disable-next-line no-console
-            console.warn("[MEW RUN DEBUG] run blocked: invalid selection", {
-                selectedNodeIds,
-            });
             return;
         }
 
@@ -181,45 +177,17 @@ const WorkbenchPanel = ({
             selectedNodeIds,
         );
         if (!startNodeId) {
-            // eslint-disable-next-line no-console
-            console.warn(
-                "[MEW RUN DEBUG] run blocked: no upstream start node",
-                { selectedNodeIds },
-            );
             return;
         }
 
         if (!runManagerRef.current) {
-            // eslint-disable-next-line no-console
-            console.warn("[MEW RUN DEBUG] run blocked: run manager not ready");
             return;
         }
 
         try {
             await runManagerRef.current.runNodeCluster(startNodeId);
-            // eslint-disable-next-line no-console
-            console.log("[MEW RUN DEBUG] cluster complete", {
-                startNodeId,
-                selectedNodeIds,
-                runtimeState: runManagerRef.current.runtimeStore.getState(),
-            });
         } catch (error) {
-            const message = String(error?.message || error);
-            // eslint-disable-next-line no-console
-            console.error("[MEW RUN DEBUG] cluster failed", {
-                startNodeId,
-                selectedNodeIds,
-                error: message,
-                runtimeState: runManagerRef.current.runtimeStore.getState(),
-            });
-
-            // Optional: friendlier cycle-specific log
-            if (/cycle/i.test(message)) {
-                // eslint-disable-next-line no-console
-                console.error(
-                    "[MEW RUN DEBUG] cycle detected in selected cluster",
-                );
-            }
+            void error;
         }
     };
 
@@ -440,8 +408,7 @@ const WorkbenchPanel = ({
                 }));
             },
             onExecutionEvent: (event) => {
-                // eslint-disable-next-line no-console
-                console.log("[MEW RUN DEBUG] event", event);
+                void event;
             },
         });
 

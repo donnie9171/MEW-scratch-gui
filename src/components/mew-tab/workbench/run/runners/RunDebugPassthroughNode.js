@@ -24,15 +24,6 @@ class RunDebugPassthroughNode extends RunNode {
             outputPortIds.forEach(portId => this.setOutput(portId, payload));
         }
 
-        // Quick visibility while implementation is in progress.
-        // eslint-disable-next-line no-console
-        console.log('[MEW RUN DEBUG] runner executed', {
-            nodeId: this.node.id,
-            nodeType: this.node.type,
-            outputPortIds,
-            triggerContext,
-            inputs: allInputs
-        });
     }
 }
 

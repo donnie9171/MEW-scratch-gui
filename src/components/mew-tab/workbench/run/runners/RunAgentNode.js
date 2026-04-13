@@ -118,8 +118,7 @@ class RunAgentNode extends RunNode {
                     this.patchRuntime({inference});
                 } catch (error) {
                     // Keep streaming on malformed chunks.
-                    // eslint-disable-next-line no-console
-                    console.warn('[MEW RUN DEBUG] llama chunk parse failed', {line, error: String(error)});
+                    void error;
                 }
             }
         }
@@ -170,15 +169,6 @@ class RunAgentNode extends RunNode {
         } else {
             inference = JSON.stringify(result, null, 2);
         }
-
-        // eslint-disable-next-line no-console
-        console.log('[MEW RUN DEBUG] Azure return', {
-            nodeId: this.node.id,
-            model: 'gpt-3.5-turbo',
-            prompt: question,
-            inference,
-            rawResult: result
-        });
 
         this.setOutput('out_value', inference);
         this.patchRuntime({
