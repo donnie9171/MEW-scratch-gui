@@ -8,6 +8,7 @@ const ToolboxPanel = () => {
     const [dragPreview, setDragPreview] = useState(null);
 
     const handlePointerDown = (event, nodeType) => {
+        if (event.pointerType && event.pointerType !== 'mouse') return;
         if (event.button !== 0) return;
 
         event.preventDefault(); // prevent text selection / native drag behavior
