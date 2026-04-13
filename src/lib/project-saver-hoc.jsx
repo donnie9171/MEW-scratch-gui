@@ -9,6 +9,7 @@ import log from '../lib/log';
 import storage from '../lib/storage';
 import dataURItoBlob from '../lib/data-uri-to-blob';
 import saveProjectToServer from '../lib/save-project-to-server';
+import {saveProjectLocally} from '../lib/local-project-storage';
 
 import {
     showAlertWithTimeout,
@@ -226,6 +227,11 @@ const ProjectSaverHOC = function (WrappedComponent) {
             // serialized project refers to a newer asset than what
             // we just finished saving).
             const savedVMState = this.props.vm.toJSON();
+            // Auto-save project to localStorage as fallback backup
+            saveProjectLocally(savedVMState, {
+                projectId: projectId,
+                projectTitle: this.props.reduxProjectTitle
+            });
             return Promise.all(this.props.vm.assets
                 .filter(asset => !asset.clean)
                 .map(
@@ -398,7 +404,7 @@ const ProjectSaverHOC = function (WrappedComponent) {
         vm: PropTypes.instanceOf(VM).isRequired
     };
     ProjectSaverComponent.defaultProps = {
-        autoSaveIntervalSecs: 600, // 10 minutes = 600 seconds
+        autoSaveIntervalSecs: 30, // 10 minutes = 600 seconds
         onRemixing: () => {},
         onSetProjectThumbnailer: () => {},
         onSetProjectSaver: () => {},

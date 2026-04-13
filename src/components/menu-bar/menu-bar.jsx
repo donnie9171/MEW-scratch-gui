@@ -8,6 +8,7 @@ import bowser from 'bowser';
 import React from 'react';
 
 import VM from 'scratch-vm';
+import {clearProjectLocally} from '../../lib/local-project-storage';
 
 import Box from '../box/box.jsx';
 import Button from '../button/button.jsx';
@@ -215,6 +216,13 @@ class MenuBar extends React.Component {
             this.props.onClearMewGraph();
             try {
                 window.localStorage.removeItem('mew.project.graph.v1');
+            } catch (e) {
+                // ignore storage failures
+            }
+
+            // clear Scratch project data + local fallback cache
+            try {
+                clearProjectLocally();
             } catch (e) {
                 // ignore storage failures
             }

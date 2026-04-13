@@ -13,6 +13,7 @@ import {
     onLoadedProject,
     projectError
 } from '../reducers/project-state';
+import {loadProjectLocallyForProject, normalizeVmProjectData} from './local-project-storage';
 
 /*
  * Higher Order Component to manage events emitted by the VM
@@ -20,6 +21,8 @@ import {
  * @returns {React.Component} connected component with vm events bound to redux
  */
 const vmManagerHOC = function (WrappedComponent) {
+    const LOAD_TIMEOUT_MS = 12000;
+
     class VMManager extends React.Component {
         constructor (props) {
             super(props);
@@ -71,7 +74,34 @@ const vmManagerHOC = function (WrappedComponent) {
             }
         }
         loadProject () {
-            return this.props.vm.loadProject(this.props.projectData)
+            const cachedProject = loadProjectLocallyForProject(this.props.projectId);
+            const cachedData = cachedProject ? (
+                cachedProject.format === 'sb3-base64'
+                    ? cachedProject.projectData
+                    : normalizeVmProjectData(cachedProject.projectData)
+            ) : null;
+            const serverData = normalizeVmProjectData(this.props.projectData);
+
+            const loadWithTimeout = payload => Promise.race([
+                this.props.vm.loadProject(payload),
+                new Promise((resolve, reject) => {
+                    window.setTimeout(() => reject(new Error('Project load timed out')), LOAD_TIMEOUT_MS);
+                })
+            ]);
+
+            const loadPromise = cachedData ? (
+                loadWithTimeout(cachedData)
+                    .then(() => {
+                        console.log('Recovered project from local storage:', cachedProject.metadata);
+                    })
+                    .catch(cacheError => {
+                        console.warn('Local project load failed, falling back:', cacheError);
+                        if (!serverData) throw cacheError;
+                        return loadWithTimeout(serverData);
+                    })
+            ) : loadWithTimeout(serverData || this.props.projectData);
+
+            return loadPromise
                 .then(() => {
                     this.props.onLoadedProject(this.props.loadingState, this.props.canSave);
                     // Wrap in a setTimeout because skin loading in

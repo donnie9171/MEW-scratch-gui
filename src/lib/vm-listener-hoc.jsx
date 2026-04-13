@@ -12,6 +12,8 @@ import {setProjectChanged, setProjectUnchanged} from '../reducers/project-change
 import {setRunningState, setTurboState, setStartedState} from '../reducers/vm-status';
 import {showExtensionAlert} from '../reducers/alerts';
 import {updateMicIndicator} from '../reducers/mic-indicator';
+import {saveProjectLocally, saveProjectSb3Locally} from './local-project-storage';
+import {getIsShowingProject} from '../reducers/project-state';
 
 /*
  * Higher Order Component to manage events emitted by the VM
@@ -22,11 +24,16 @@ const vmListenerHOC = function (WrappedComponent) {
     class VMListener extends React.Component {
         constructor (props) {
             super(props);
+            this.localSnapshotTimeout = null;
+            this.localSnapshotInFlight = false;
+            this.localSnapshotQueued = false;
             bindAll(this, [
                 'handleKeyDown',
                 'handleKeyUp',
                 'handleProjectChanged',
-                'handleTargetsUpdate'
+                'handleTargetsUpdate',
+                'scheduleLocalSnapshot',
+                'persistLocalSnapshot'
             ]);
             // We have to start listening to the vm here rather than in
             // componentDidMount because the HOC mounts the wrapped component,
@@ -68,15 +75,60 @@ const vmListenerHOC = function (WrappedComponent) {
         }
         componentWillUnmount () {
             this.props.vm.removeListener('PERIPHERAL_CONNECTION_LOST_ERROR', this.props.onShowExtensionAlert);
+            if (this.localSnapshotTimeout) {
+                window.clearTimeout(this.localSnapshotTimeout);
+                this.localSnapshotTimeout = null;
+            }
             if (this.props.attachKeyboardEvents) {
                 document.removeEventListener('keydown', this.handleKeyDown);
                 document.removeEventListener('keyup', this.handleKeyUp);
             }
         }
+        scheduleLocalSnapshot () {
+            if (this.localSnapshotTimeout) {
+                window.clearTimeout(this.localSnapshotTimeout);
+            }
+            this.localSnapshotTimeout = window.setTimeout(this.persistLocalSnapshot, 1200);
+        }
+        async persistLocalSnapshot () {
+            if (this.localSnapshotInFlight) {
+                this.localSnapshotQueued = true;
+                return;
+            }
+
+            this.localSnapshotInFlight = true;
+            this.localSnapshotTimeout = null;
+
+            const metadata = {
+                projectId: this.props.projectId,
+                projectTitle: this.props.projectTitle
+            };
+
+            try {
+                const sb3Content = await this.props.vm.saveProjectSb3();
+                const savedSb3 = await saveProjectSb3Locally(sb3Content, metadata);
+
+                if (!savedSb3) {
+                    saveProjectLocally(this.props.vm.toJSON(), metadata);
+                }
+            } catch (e) {
+                saveProjectLocally(this.props.vm.toJSON(), metadata);
+            } finally {
+                this.localSnapshotInFlight = false;
+                if (this.localSnapshotQueued) {
+                    this.localSnapshotQueued = false;
+                    this.scheduleLocalSnapshot();
+                }
+            }
+        }
         handleProjectChanged () {
-            if (this.props.shouldUpdateProjectChanged && !this.props.projectChanged) {
+            if (!this.props.shouldUpdateProjectChanged || !this.props.isShowingProject) return;
+
+            if (!this.props.projectChanged) {
                 this.props.onProjectChanged();
             }
+
+            this.scheduleLocalSnapshot();
         }
         handleTargetsUpdate (data) {
             if (this.props.shouldUpdateTargets) {
@@ -135,6 +187,9 @@ const vmListenerHOC = function (WrappedComponent) {
                 onTurboModeOff,
                 onTurboModeOn,
                 onShowExtensionAlert,
+                projectId,
+                projectTitle,
+                isShowingProject,
                 /* eslint-enable no-unused-vars */
                 ...props
             } = this.props;
@@ -159,6 +214,9 @@ const vmListenerHOC = function (WrappedComponent) {
         onTurboModeOff: PropTypes.func.isRequired,
         onTurboModeOn: PropTypes.func.isRequired,
         projectChanged: PropTypes.bool,
+        isShowingProject: PropTypes.bool,
+        projectId: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+        projectTitle: PropTypes.string,
         shouldUpdateTargets: PropTypes.bool,
         shouldUpdateProjectChanged: PropTypes.bool,
         username: PropTypes.string,
@@ -170,6 +228,9 @@ const vmListenerHOC = function (WrappedComponent) {
     };
     const mapStateToProps = state => ({
         projectChanged: state.scratchGui.projectChanged,
+        isShowingProject: getIsShowingProject(state.scratchGui.projectState.loadingState),
+        projectId: state.scratchGui.projectState.projectId,
+        projectTitle: state.scratchGui.projectTitle,
         // Do not emit target or project updates in fullscreen or player only mode
         // or when recording sounds (it leads to garbled recordings on low-power machines)
         shouldUpdateTargets: !state.scratchGui.mode.isFullScreen && !state.scratchGui.mode.isPlayerOnly &&
