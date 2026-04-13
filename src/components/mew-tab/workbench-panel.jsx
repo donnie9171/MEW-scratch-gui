@@ -959,6 +959,24 @@ const WorkbenchPanel = ({
 
             if (droppedInToolbox) {
                 const idsToDelete = active?.draggedNodeIds || [anchorNode.id];
+
+                if (
+                    idsToDelete.length > 1 &&
+                    !window.confirm(`Delete ${idsToDelete.length} nodes?`)
+                ) {
+                    setDragPreviews([]);
+                    setGraph((prev) => ({
+                        ...prev,
+                        meta: {
+                            ...prev.meta,
+                            updatedAt: new Date().toISOString(),
+                        },
+                    }));
+                    window.removeEventListener("pointermove", onPointerMove);
+                    window.removeEventListener("pointerup", onPointerUp);
+                    return;
+                }
+
                 setDeletingNodeId(active?.deleteRefNodeId || anchorNode.id);
 
                 const dx = upEvent.clientX - active.startClientX;
