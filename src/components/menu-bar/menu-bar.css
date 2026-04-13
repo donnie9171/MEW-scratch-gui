@@ -119,6 +119,22 @@
     height: 34px;
 }
 
+.mew-notice {
+    font-weight: normal;
+    text-align: right;
+    opacity: 0.8;
+}
+
+.mew-notice-link {
+    color: inherit;
+    font-weight: normal;
+    text-decoration: none;
+}
+
+.mew-notice-link:hover {
+    text-decoration: underline;
+}
+
 .author-info {
     margin-left: .25rem;
     margin-right: .6875rem;

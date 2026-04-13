@@ -774,6 +774,18 @@ class MenuBar extends React.Component {
                             id="gui.menuBar.docs"
                         />
                     </div>
+
+                    <Divider className={classNames(styles.divider)} />
+                    <div className={classNames(styles.menuBarItem, styles.mewNotice)}>
+                        <a
+                            className={styles.mewNoticeLink}
+                            href="https://fireworks-studios.gitbook.io/fireworks-studios/mew-multi-agent-exploration-workbench"
+                            rel="noopener noreferrer"
+                            target="_blank"
+                        >
+                            MEW v0.2.1 | This is a work in progress prototype by Enoch Kang for his final year project at HKU. Not affiliated with Scratch.
+                        </a>
+                    </div>
                 </div>
 
                 {/* show the proper UI in the account menu, given whether the user is
