@@ -51,7 +51,6 @@ const flushServoSend = async key => {
         const conn = await ensureConnection();
         if (typeof conn?.send !== "function") return false;
 
-        console.log(`Sending position ${nextPosition} to servo ${key} on ESP32...`);
         await conn.send("browser-event", { [key]: nextPosition });
 
         state.lastSentAt = Date.now();
@@ -101,6 +100,19 @@ export const sendServoPositionToEsp32 = async ({ servoKey, position }) => {
     const clampedPosition = Math.round(Math.max(0, Math.min(180, position)));
 
     const state = getThrottleState(key);
+
+    // Drop no-op updates: if this value is already pending or was just sent,
+    // there is nothing new to transmit.
+    if (state.pendingPosition === clampedPosition) {
+        return false;
+    }
+    if (
+        !Number.isFinite(state.pendingPosition) &&
+        state.lastSentPosition === clampedPosition
+    ) {
+        return false;
+    }
+
     state.pendingPosition = clampedPosition;
 
     // If enough time has elapsed, flush immediately; otherwise, send on the next slot.
