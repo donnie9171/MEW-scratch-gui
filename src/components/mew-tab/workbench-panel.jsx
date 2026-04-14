@@ -47,10 +47,15 @@ import {
     detachScratchBroadcastHooks
 } from "./helper/scratchVm";
 import { sendServoPositionToEsp32 } from "./helper/esp32Serial";
+import { AZURE_SOURCE } from "./helper/azureConfig";
+import { userId } from "./helper/userId";
 
 const PROJECT_STORAGE_KEY = "mew.project.graph.v1";
 const STATUS_ROW_ID = "state";
 const VM_POLL_INTERVAL_MS = 1000;
+const TOKEN_BUCKET_STORAGE_KEY = "tokenBucketEstimate";
+const MAX_TOKENS = 1000;
+const REFILL_RATE = 1;
 
 const areStringArraysEqual = (a = [], b = []) => {
     if (a.length !== b.length) return false;
@@ -83,6 +88,89 @@ const loadLocalGraph = () => {
     }
 };
 
+const loadStoredTokenBucket = () => {
+    if (typeof window === "undefined") {
+        return {
+            userId: "unknown",
+            tokensRemaining: MAX_TOKENS,
+            lastRefill: Date.now(),
+            maxTokens: MAX_TOKENS,
+            refillRate: REFILL_RATE,
+        };
+    }
+
+    try {
+        const raw = window.localStorage.getItem(TOKEN_BUCKET_STORAGE_KEY);
+        if (!raw) {
+            const initialValue = {
+                userId: "unknown",
+                tokensRemaining: MAX_TOKENS,
+                lastRefill: Date.now(),
+                maxTokens: MAX_TOKENS,
+                refillRate: REFILL_RATE,
+            };
+            window.localStorage.setItem(
+                TOKEN_BUCKET_STORAGE_KEY,
+                JSON.stringify(initialValue),
+            );
+            return initialValue;
+        }
+
+        return JSON.parse(raw);
+    } catch {
+        return {
+            userId: "unknown",
+            tokensRemaining: MAX_TOKENS,
+            lastRefill: Date.now(),
+            maxTokens: MAX_TOKENS,
+            refillRate: REFILL_RATE,
+        };
+    }
+};
+
+const storeTokenBucketEstimate = (estimateObj) => {
+    try {
+        window.localStorage.setItem(
+            TOKEN_BUCKET_STORAGE_KEY,
+            JSON.stringify(estimateObj),
+        );
+    } catch {
+        // ignore
+    }
+};
+
+const normalizeTokenBucketEstimate = (tokenBucket = {}) => ({
+    userId: tokenBucket.userId || "unknown",
+    tokensRemaining: Math.max(
+        0,
+        Math.min(
+            MAX_TOKENS,
+            Math.floor(Number(tokenBucket.tokensRemaining) || MAX_TOKENS),
+        ),
+    ),
+    lastRefill: Number(tokenBucket.lastRefill) || Date.now(),
+    maxTokens: MAX_TOKENS,
+    refillRate: REFILL_RATE,
+});
+
+const computeTokenBucketView = (tokenBucket) => {
+    const normalized = normalizeTokenBucketEstimate(tokenBucket);
+    const now = Date.now();
+    const secondsSinceRefill = Math.floor(
+        (now - normalized.lastRefill) / 1000,
+    );
+    const estimatedTokens = Math.min(
+        normalized.maxTokens,
+        normalized.tokensRemaining + secondsSinceRefill * normalized.refillRate,
+    );
+
+    return {
+        ...normalized,
+        tokensRemaining: Math.max(0, Math.floor(estimatedTokens)),
+        percent: Math.max(0, Math.min(1, estimatedTokens / normalized.maxTokens)),
+    };
+};
+
 const WorkbenchPanel = ({
     setMewGraph: dispatchSetMewGraph,
     undoMewGraph: dispatchUndoMewGraph,
@@ -108,6 +196,12 @@ const WorkbenchPanel = ({
     const dragRef = useRef(null);
     const [dragPreviews, setDragPreviews] = useState([]);
     const dragOverToolboxRef = useRef(false);
+    const tokenBucketRef = useRef(loadStoredTokenBucket());
+    const [tokenBucketView, setTokenBucketView] = useState(() =>
+        computeTokenBucketView(tokenBucketRef.current),
+    );
+    const updateTokenBucketBarRef = useRef(null);
+    const [isRefillingTokens, setIsRefillingTokens] = useState(false);
 
     const [overlaySize, setOverlaySize] = useState({ width: 1, height: 1 });
     const [layoutVersion, setLayoutVersion] = useState(0);
@@ -267,6 +361,112 @@ const WorkbenchPanel = ({
         active.blur();
     };
 
+    updateTokenBucketBarRef.current = (incomingTokenBucket) => {
+        if (!incomingTokenBucket) return;
+
+        const normalizedIncoming = normalizeTokenBucketEstimate(
+            incomingTokenBucket,
+        );
+        const currentTokenBucket = tokenBucketRef.current;
+
+        if (
+            !currentTokenBucket ||
+            normalizedIncoming.lastRefill >= currentTokenBucket.lastRefill
+        ) {
+            tokenBucketRef.current = normalizedIncoming;
+        }
+
+        const nextView = computeTokenBucketView(tokenBucketRef.current);
+        setTokenBucketView(nextView);
+        storeTokenBucketEstimate({
+            ...tokenBucketRef.current,
+            tokensRemaining: nextView.tokensRemaining,
+        });
+
+        if (typeof window !== "undefined") {
+            window.currentTokenBucketInfo = {
+                ...tokenBucketRef.current,
+                tokensRemaining: nextView.tokensRemaining,
+            };
+        }
+    };
+
+    useEffect(() => {
+        if (typeof window === "undefined") return undefined;
+
+        const tick = () => {
+            const nextView = computeTokenBucketView(tokenBucketRef.current);
+            setTokenBucketView(nextView);
+            storeTokenBucketEstimate({
+                ...tokenBucketRef.current,
+                tokensRemaining: nextView.tokensRemaining,
+            });
+            window.currentTokenBucketInfo = {
+                ...tokenBucketRef.current,
+                tokensRemaining: nextView.tokensRemaining,
+            };
+        };
+
+        tick();
+        const intervalId = window.setInterval(tick, 1000);
+        const legacyUpdater = (incomingTokenBucket) => {
+            updateTokenBucketBarRef.current?.(incomingTokenBucket);
+        };
+
+        window.updateTokenBucketBar = legacyUpdater;
+
+        return () => {
+            window.clearInterval(intervalId);
+            if (window.updateTokenBucketBar === legacyUpdater) {
+                delete window.updateTokenBucketBar;
+            }
+        };
+    }, []);
+
+    const handleRefillTokens = async () => {
+        if (isRefillingTokens) return;
+
+        setIsRefillingTokens(true);
+
+        try {
+            const response = await fetch(`${AZURE_SOURCE}/api/refillBucket`, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "x-api-key": userId,
+                },
+            });
+
+            let result;
+            const contentType = response.headers.get("content-type");
+            if (contentType && contentType.includes("application/json")) {
+                result = await response.json();
+            } else {
+                result = { message: await response.text() };
+            }
+
+            if (response.ok && result.tokenBucket) {
+                updateTokenBucketBarRef.current?.(result.tokenBucket);
+                if (typeof window !== "undefined") {
+                    window.alert("Tokens refilled!");
+                }
+                return;
+            }
+
+            if (typeof window !== "undefined") {
+                window.alert(
+                    result.message || "Refill failed. You may not be whitelisted.",
+                );
+            }
+        } catch (error) {
+            if (typeof window !== "undefined") {
+                window.alert(`Error contacting server: ${error.message}`);
+            }
+        } finally {
+            setIsRefillingTokens(false);
+        }
+    };
+
     const normalizeRect = (box) => {
         if (!box) return null;
         return {
@@ -387,6 +587,9 @@ const WorkbenchPanel = ({
                         };
                     }),
                 }));
+                if (patch?.tokenBucket) {
+                    updateTokenBucketBarRef.current?.(patch.tokenBucket);
+                }
             },
             applyNodeDataPatch: (nodeId, rowId, field, value) => {
                 suppressNextCheckpointRef.current = true;
@@ -1670,6 +1873,34 @@ const WorkbenchPanel = ({
             className={styles.workbench}
             onPointerDown={handleWorkbenchPointerDown}
         >
+            <div className={styles.tokenBucketBarShell}>
+                <div
+                    className={styles.tokenBucketBar}
+                    onPointerDown={(event) => event.stopPropagation()}
+                >
+                    <div
+                        className={styles.tokenBucketBarTrack}
+                        role="progressbar"
+                        aria-valuemin={0}
+                        aria-valuemax={tokenBucketView.maxTokens}
+                        aria-valuenow={tokenBucketView.tokensRemaining}
+                        aria-label="Token bucket remaining"
+                    >
+                        <div
+                            className={styles.tokenBucketBarFill}
+                            style={{
+                                width: `${tokenBucketView.percent * 100}%`,
+                            }}
+                        >
+                        <span className={styles.tokenBucketBarText}>
+                            Tokens: {tokenBucketView.tokensRemaining}/
+                            {tokenBucketView.maxTokens}
+                        </span>
+                        </div>
+
+                    </div>
+                </div>
+            </div>
             <svg
                 key={layoutVersion}
                 className={styles.connectionsLayer}
