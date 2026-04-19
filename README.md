@@ -1,4 +1,17 @@
-# scratch-gui
+# MEW (Multi-agent Exploration Workshop) README
+Enoch (I-Nuo) Kang 3035988378 HKU CS FYP25033
+
+Open a Command Prompt or Terminal in the repository and run:
+
+```bash
+npm install
+npm start
+```
+
+Then go to [http://localhost:8601/](http://localhost:8601/)
+
+
+# Original scratch-gui readme
 
 ## **⚠️ NOTICE: Repository Migration to Mono-Repo ⚠️**
 
