@@ -27,7 +27,12 @@ const normalizeModel = raw => {
 
 const getAzureSource = context => {
     // Allow optional override via injected services, default to legacy constant
-    return context?.services?.azureSource || AZURE_SOURCE;
+    const source = context?.services?.azureSource || AZURE_SOURCE;
+    if (!source) {
+        return source;
+    }
+
+    return /^https?:\/\//i.test(source) ? source : `https://${source}`;
 };
 
 const getApiKey = context => {
