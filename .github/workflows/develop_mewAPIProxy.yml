@@ -73,3 +73,12 @@ jobs:
           package: ${{ env.AZURE_FUNCTIONAPP_PACKAGE_PATH }}
           publish-profile: ${{ secrets.AZUREAPPSERVICE_PUBLISHPROFILE }}
           sku: flexconsumption
+
+      - name: Inspect Azure Function package
+        run: |
+          echo "=== Azure Function package ==="
+          find ./azure -maxdepth 3 -type f | sort
+          echo "=== package.json ==="
+          cat ./azure/package.json
+          echo "=== host.json ==="
+          cat ./azure/host.json
