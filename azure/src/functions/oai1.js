@@ -5,6 +5,11 @@ const { TableClient, AzureNamedKeyCredential } = require("@azure/data-tables");
 const TABLE_NAME = "TokenBuckets";
 const MAX_TOKENS = 1000; 
 const REFILL_RATE = 1; // tokens per second
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type, x-api-key'
+};
 
 // Helper: get user ID (customize as needed)
 function getUserId(request) {
@@ -33,9 +38,15 @@ function refillTokens(bucket) {
 }
 
 app.http('oai1', {
-methods: ['POST'],
+methods: ['POST', 'OPTIONS'],
     authLevel: 'anonymous',
     handler: async (request, context) => {
+        if (request.method === 'OPTIONS') {
+          return {
+            status: 204,
+            headers: corsHeaders
+          };
+        }
 
         // Table client
         const connectionString = process.env.TABLE_STORAGE_CONNECTION_STRING;
@@ -66,7 +77,7 @@ methods: ['POST'],
 
         // Check bucket
         if (bucket.tokens < 0) {
-        return { status: 429, body: 'Rate limit exceeded. Not enough tokens.' };
+        return { status: 429, headers: corsHeaders, body: 'Rate limit exceeded. Not enough tokens.' };
         }
 
         // Parse request
@@ -75,7 +86,7 @@ methods: ['POST'],
     try {
       body = await request.json();
     } catch (e) {
-      return { status: 400, body: 'Invalid JSON body.' };
+      return { status: 400, headers: corsHeaders, body: 'Invalid JSON body.' };
     }
     const endpoint = "https://api.openai.com/v1/chat/completions";
     const { messages } = body;
@@ -85,10 +96,10 @@ methods: ['POST'],
     };
     const apiKey = process.env.OPENAI_API_KEY;
     if (!endpoint || !payload) {
-      return { status: 400, body: 'Missing endpoint or payload.' };
+      return { status: 400, headers: corsHeaders, body: 'Missing endpoint or payload.' };
     }
     if (!apiKey) {
-      return { status: 500, body: 'API key not configured.' };
+      return { status: 500, headers: corsHeaders, body: 'API key not configured.' };
     }
 
     // Proxy to OpenAI
@@ -105,7 +116,7 @@ methods: ['POST'],
       result = await response.json();
     } catch (err) {
       context.log('OpenAI relay error:', err);
-      return { status: 500, body: 'Error relaying to OpenAI API.' };
+      return { status: 500, headers: corsHeaders, body: 'Error relaying to OpenAI API.' };
     }
 
     // Get tokens used (OpenAI returns usage in response)
@@ -119,7 +130,7 @@ methods: ['POST'],
 
     // Check bucket
     if (bucket.tokens < tokensUsed) {
-      return { status: 429, body: 'Rate limit exceeded. Not enough tokens.' };
+      return { status: 429, headers: corsHeaders, body: 'Rate limit exceeded. Not enough tokens.' };
     }
     bucket.tokens -= tokensUsed;
 
@@ -129,7 +140,7 @@ methods: ['POST'],
     context.log('OpenAI response:', JSON.stringify(result, null, 2));
     return {
       status: response.status,
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", ...corsHeaders },
       body: JSON.stringify({
         ...result,
         tokenBucket: {
@@ -154,7 +165,7 @@ app.http('refillBucket', {
     const userId = getUserId(request);
 
     if (!isWhitelisted(userId)) {
-      return { status: 403, body: 'User not whitelisted for refill.' };
+      return { status: 403, headers: corsHeaders, body: 'User not whitelisted for refill.' };
     }
 
     // Fetch or create bucket
@@ -179,7 +190,7 @@ app.http('refillBucket', {
 
     return {
       status: 200,
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", ...corsHeaders },
       body: JSON.stringify({
         message: "Tokens refilled!",
         tokenBucket: {
